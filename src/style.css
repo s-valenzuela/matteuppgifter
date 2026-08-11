@@ -230,6 +230,12 @@ input[type='checkbox'] {
   background: #f0f0f0;
 }
 
+.copy-link-status {
+  align-self: center;
+  font-size: 0.85rem;
+  color: #2a7a2a;
+}
+
 .warnings {
   background: #fff7e0;
   border: 1px solid #e8c766;

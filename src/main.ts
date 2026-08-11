@@ -2,6 +2,8 @@ import './style.css';
 import { generateProblems } from './core/generate';
 import { validateConfig } from './core/validate';
 import { renderProblemsToPdf } from './pdf/render';
+import { decodeState, encodeState } from './state/urlState';
+import { loadState, saveState } from './state/storage';
 import { mountForm } from './ui/form';
 import { mountPreview } from './ui/preview';
 import { PRESETS } from './ui/presets';
@@ -21,9 +23,15 @@ const warningsContainer = mustQuery<HTMLDivElement>('#warnings');
 const previewFrame = mustQuery<HTMLIFrameElement>('#preview');
 const downloadButton = mustQuery<HTMLButtonElement>('#download-button');
 const printButton = mustQuery<HTMLButtonElement>('#print-button');
+const copyLinkButton = mustQuery<HTMLButtonElement>('#copy-link-button');
+const copyLinkStatus = mustQuery<HTMLSpanElement>('#copy-link-status');
 const resetButton = mustQuery<HTMLButtonElement>('#reset-button');
 
-const form = mountForm(settingsPanel, createDefaultState());
+// En länk ska återskapa exakt samma blad: URL:en tar företräde (delad länk),
+// annars återanvänds senaste sparade inställningar från den här webbläsaren.
+const initialState = decodeState(window.location.search) ?? loadState() ?? createDefaultState();
+
+const form = mountForm(settingsPanel, initialState);
 const preview = mountPreview(previewFrame);
 
 for (const preset of PRESETS) {
@@ -56,6 +64,19 @@ function regenerate(state: AppState): void {
   preview.update(problems, toDocumentConfig(state));
 }
 
+let copyLinkStatusTimeoutId: number | undefined;
+
+/**
+ * Håller URL:en och localStorage i synk med formuläret. history.replaceState
+ * (inte pushState) så att varje tangenttryckning inte fyller bakåtknappen
+ * med mellansteg — bara den senaste, delbara länken behövs.
+ */
+function persistState(state: AppState): void {
+  saveState(state);
+  const url = `${window.location.pathname}?${encodeState(state).toString()}`;
+  window.history.replaceState(null, '', url);
+}
+
 function buildCurrentPdf() {
   const state = form.getState();
   const { config } = validateConfig(state.generator);
@@ -85,7 +106,32 @@ printButton.addEventListener('click', () => {
   window.open(url, '_blank');
 });
 
+copyLinkButton.addEventListener('click', () => {
+  void copyCurrentLink();
+});
+
+async function copyCurrentLink(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(window.location.href);
+    showCopyLinkStatus('Länk kopierad!');
+  } catch {
+    showCopyLinkStatus('Kunde inte kopiera länken.');
+  }
+}
+
+function showCopyLinkStatus(message: string): void {
+  copyLinkStatus.textContent = message;
+  if (copyLinkStatusTimeoutId !== undefined) {
+    window.clearTimeout(copyLinkStatusTimeoutId);
+  }
+  copyLinkStatusTimeoutId = window.setTimeout(() => {
+    copyLinkStatus.textContent = '';
+  }, 2500);
+}
+
 resetButton.addEventListener('click', () => form.setState(createDefaultState()));
 
 form.onChange(regenerate);
+form.onChange(persistState);
 regenerate(form.getState());
+persistState(form.getState());
