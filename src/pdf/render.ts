@@ -109,7 +109,7 @@ function drawProblem(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(config.fontSizePt);
 
-  const prompt = `${position.index + 1}. ${formatProblemPrompt(problem)}`;
+  const prompt = formatProblemPrompt(problem);
   doc.text(prompt, position.xMm, position.yMm);
 
   const answerX = position.xMm + doc.getTextWidth(prompt) + GAP_AFTER_PROMPT_MM;

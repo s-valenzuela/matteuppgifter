@@ -21,6 +21,11 @@ export default [
     },
     rules: {
       ...tseslint.configs.recommended.rules,
+      // TypeScript själv fångar odefinierade identifierare. Basregeln no-undef
+      // ger falska positiva på ambienta DOM-typer (t.ex. ParentNode) som inte
+      // finns i "globals"-listan — avstängd enligt typescript-eslints egen
+      // rekommendation.
+      'no-undef': 'off',
     },
   },
   {
@@ -38,6 +43,11 @@ export default [
     },
     rules: {
       ...tseslint.configs.recommended.rules,
+      // TypeScript själv fångar odefinierade identifierare. Basregeln no-undef
+      // ger falska positiva på ambienta DOM-typer (t.ex. ParentNode) som inte
+      // finns i "globals"-listan — avstängd enligt typescript-eslints egen
+      // rekommendation.
+      'no-undef': 'off',
     },
   },
   prettierConfig,

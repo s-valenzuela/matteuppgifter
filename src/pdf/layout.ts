@@ -32,11 +32,13 @@ const LINE_HEIGHT_FACTOR = 2.4;
 const MIN_ROW_HEIGHT_MM = 6;
 /**
  * Uppskattat antal tecken i den längsta rimliga uppgiftssträngen, t.ex.
- * "123. 100 + 100 = _______" (tvåsiffrigt uppgiftsnummer, tresiffriga
- * operander, tomt svarsfält). Satt lågt ger för många kolumner och text
- * som överlappar nästa kolumn, så den här ska hellre vara i överkant.
+ * "100 + 100 = _______" (tresiffriga operander, tomt svarsfält — uppgifter
+ * har inget uppgiftsnummer, se render.ts). Satt lågt ger för många kolumner
+ * och text som överlappar nästa kolumn, så den här ska hellre vara i
+ * överkant. Kalibrerad mot jsPDF:s doc.getTextWidth() (uppmätt värsta fall:
+ * 19 tecken), med någon marginal.
  */
-const ESTIMATED_CHARS_PER_PROBLEM = 24;
+const ESTIMATED_CHARS_PER_PROBLEM = 20;
 /** Extra luft per kolumn utöver den uppskattade textbredden. */
 const COLUMN_GUTTER_MM = 4;
 

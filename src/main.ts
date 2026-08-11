@@ -1,52 +1,91 @@
+import './style.css';
 import { generateProblems } from './core/generate';
 import { validateConfig } from './core/validate';
 import { renderProblemsToPdf } from './pdf/render';
-import type { DocumentConfig, GeneratorConfig } from './types';
+import { mountForm } from './ui/form';
+import { mountPreview } from './ui/preview';
+import { PRESETS } from './ui/presets';
+import { createDefaultState, toDocumentConfig, type AppState } from './ui/state';
 
-const app = document.querySelector<HTMLDivElement>('#app');
-
-if (app) {
-  app.innerHTML = `
-    <main>
-      <h1>Matteuppgifter</h1>
-      <p>PDF-generator för de fyra räknesätten. Under uppbyggnad — det riktiga
-      formuläret (M3) finns inte än. Knappen nedan är en tillfällig manuell
-      koll av PDF-renderingen från M2.</p>
-      <button id="download">Ladda ner exempel-PDF</button>
-    </main>
-  `;
+function mustQuery<T extends Element>(selector: string): T {
+  const el = document.querySelector<T>(selector);
+  if (!el) {
+    throw new Error(`Sidan saknar förväntat element: ${selector}`);
+  }
+  return el;
 }
 
-const demoGeneratorConfig: GeneratorConfig = {
-  operations: {
-    add: { enabled: true, operandRange: { min: 0, max: 20 } },
-    sub: { enabled: true, operandRange: { min: 0, max: 20 }, noNegative: true },
-    mul: { enabled: true, operandRange: { min: 0, max: 10 }, tables: [2, 5, 10] },
-    div: { enabled: true, operandRange: { min: 1, max: 10 } },
-  },
-  count: 30,
-  avoidDuplicates: true,
-  shuffle: true,
-  seed: 1,
-};
+const settingsPanel = mustQuery<HTMLDivElement>('#settings-panel');
+const quickstartContainer = mustQuery<HTMLDivElement>('#quickstart');
+const warningsContainer = mustQuery<HTMLDivElement>('#warnings');
+const previewFrame = mustQuery<HTMLIFrameElement>('#preview');
+const downloadButton = mustQuery<HTMLButtonElement>('#download-button');
+const printButton = mustQuery<HTMLButtonElement>('#print-button');
+const resetButton = mustQuery<HTMLButtonElement>('#reset-button');
 
-const demoDocumentConfig: DocumentConfig = {
-  header: { title: 'Matteuppgifter', showName: true, showDate: true },
-  fontSizePt: 14,
-  columns: 'auto',
-  answerStyle: 'blank',
-  includeAnswerKey: true,
-  seed: demoGeneratorConfig.seed,
-};
+const form = mountForm(settingsPanel, createDefaultState());
+const preview = mountPreview(previewFrame);
 
-const { config, warnings } = validateConfig(demoGeneratorConfig);
-if (warnings.length > 0) {
-  console.warn('Varningar från validateConfig:', warnings);
+for (const preset of PRESETS) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = preset.label;
+  button.addEventListener('click', () => form.setState(preset.build()));
+  quickstartContainer.appendChild(button);
 }
-const demoProblems = generateProblems(config);
-console.log('Genererade uppgifter (demo):', demoProblems);
 
-document.querySelector<HTMLButtonElement>('#download')?.addEventListener('click', () => {
-  const doc = renderProblemsToPdf(demoProblems, demoDocumentConfig);
-  doc.save('matteuppgifter-demo.pdf');
+function renderWarnings(warnings: string[]): void {
+  if (warnings.length === 0) {
+    warningsContainer.innerHTML = '';
+    return;
+  }
+  const items = warnings.map((w) => `<li>${escapeHtml(w)}</li>`).join('');
+  warningsContainer.innerHTML = `<div class="warnings"><strong>Att tänka på:</strong><ul>${items}</ul></div>`;
+}
+
+function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function regenerate(state: AppState): void {
+  const { config, warnings } = validateConfig(state.generator);
+  renderWarnings(warnings);
+  const problems = generateProblems(config);
+  preview.update(problems, toDocumentConfig(state));
+}
+
+function buildCurrentPdf() {
+  const state = form.getState();
+  const { config } = validateConfig(state.generator);
+  const problems = generateProblems(config);
+  return renderProblemsToPdf(problems, toDocumentConfig(state));
+}
+
+function sanitizeFilename(title: string): string {
+  return title
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9åäö]+/gi, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+downloadButton.addEventListener('click', () => {
+  const doc = buildCurrentPdf();
+  const filename = sanitizeFilename(form.getState().document.header.title) || 'matteuppgifter';
+  doc.save(`${filename}.pdf`);
 });
+
+printButton.addEventListener('click', () => {
+  const doc = buildCurrentPdf();
+  // output('bloburl') returnerar i praktiken en sträng, trots vad jsPDF:s
+  // typer säger — se kommentaren i ui/preview.ts.
+  const url = doc.output('bloburl') as unknown as string;
+  window.open(url, '_blank');
+});
+
+resetButton.addEventListener('click', () => form.setState(createDefaultState()));
+
+form.onChange(regenerate);
+regenerate(form.getState());
