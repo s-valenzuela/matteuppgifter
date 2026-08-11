@@ -11,15 +11,18 @@ const OPERATION_LABELS: Record<Operation, string> = {
 
 const OPERATION_KEYS: readonly Operation[] = ['add', 'sub', 'mul', 'div'];
 
-// Feather-ikoner (MIT), inbäddade som inline-SVG istället för en extern ikonfil
+// Feather-ikon (MIT), inbäddad som inline-SVG istället för en extern ikonfil
 // eftersom appen inte har några andra tillgångar att ladda in.
-const REFRESH_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true" focusable="false"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>`;
 const EDIT_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true" focusable="false"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>`;
 
 export interface FormController {
   getState(): AppState;
   onChange(listener: (state: AppState) => void): void;
   setState(next: AppState): void;
+  /** Slumpar en ny seed. Knappen som utlöser det här sitter bland de andra
+   * handlingsknapparna (Ladda ner, Skriv ut, ...) i main.ts, inte i formuläret
+   * själv, men logiken hör hemma här tillsammans med resten av seed-hanteringen. */
+  randomizeSeed(): void;
 }
 
 export function mountForm(container: HTMLElement, initialState: AppState): FormController {
@@ -48,7 +51,6 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const shuffleEl = q<HTMLInputElement>(container, '#shuffle');
   const seedEl = q<HTMLInputElement>(container, '#seed');
   const seedEditButton = q<HTMLButtonElement>(container, '#seed-edit');
-  const seedRandomizeButton = q<HTMLButtonElement>(container, '#seed-randomize');
 
   const columnsEl = q<HTMLSelectElement>(container, '#columns');
   const fontSizeEl = q<HTMLInputElement>(container, '#fontSize');
@@ -188,11 +190,6 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     seedEl.readOnly = true;
     seedEl.value = String(state.generator.seed);
   });
-  seedRandomizeButton.addEventListener('click', () => {
-    state.generator.seed = Math.floor(Math.random() * 1_000_000);
-    refreshFromState();
-    emitChange();
-  });
 
   columnsEl.addEventListener('change', () => {
     state.document.columns = columnsEl.value === 'auto' ? 'auto' : Number(columnsEl.value);
@@ -235,6 +232,11 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     onChange: (listener) => listeners.push(listener),
     setState: (next) => {
       state = next;
+      refreshFromState();
+      emitChange();
+    },
+    randomizeSeed: () => {
+      state.generator.seed = Math.floor(Math.random() * 1_000_000);
       refreshFromState();
       emitChange();
     },
@@ -344,10 +346,6 @@ function renderTemplate(): string {
           <input type="text" id="seed" inputmode="numeric" pattern="[0-9]*" readonly />
           <button type="button" id="seed-edit" class="icon-button" aria-label="Redigera seed" title="Redigera seed">
             ${EDIT_ICON_SVG}
-          </button>
-          <button type="button" id="seed-randomize" class="icon-button-labelled" title="Slumpa om en ny seed">
-            ${REFRESH_ICON_SVG}
-            <span>Slumpa om</span>
           </button>
         </div>
       </label>

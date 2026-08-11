@@ -25,6 +25,7 @@ const downloadButton = mustQuery<HTMLButtonElement>('#download-button');
 const printButton = mustQuery<HTMLButtonElement>('#print-button');
 const copyLinkButton = mustQuery<HTMLButtonElement>('#copy-link-button');
 const copyLinkStatus = mustQuery<HTMLSpanElement>('#copy-link-status');
+const seedRandomizeButton = mustQuery<HTMLButtonElement>('#seed-randomize-button');
 const resetButton = mustQuery<HTMLButtonElement>('#reset-button');
 
 // En länk ska återskapa exakt samma blad: URL:en tar företräde (delad länk),
@@ -128,6 +129,8 @@ function showCopyLinkStatus(message: string): void {
     copyLinkStatus.textContent = '';
   }, 2500);
 }
+
+seedRandomizeButton.addEventListener('click', () => form.randomizeSeed());
 
 resetButton.addEventListener('click', () => form.setState(createDefaultState()));
 
