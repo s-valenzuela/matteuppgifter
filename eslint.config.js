@@ -50,6 +50,14 @@ export default [
       'no-undef': 'off',
     },
   },
+  {
+    files: ['public/sw.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'script',
+      globals: globals.serviceworker,
+    },
+  },
   prettierConfig,
   {
     ignores: ['dist/**', 'node_modules/**'],

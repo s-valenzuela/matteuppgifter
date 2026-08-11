@@ -138,3 +138,16 @@ form.onChange(regenerate);
 form.onChange(persistState);
 regenerate(form.getState());
 persistState(form.getState());
+
+// Registrerar service workern (public/sw.js) så appen fungerar offline efter
+// första besöket, se PLAN.md avsnitt 8. BASE_URL respekterar vite.config.ts:s
+// `base: '/matteuppgifter/'` i både dev och prod. Offline/PWA är en bonus,
+// inte kritiskt — en misslyckad registrering (äldre webbläsare, testmiljö
+// utan https) ska aldrig störa resten av appen.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
+      // Se kommentaren ovan — tystnar avsiktligt.
+    });
+  });
+}
