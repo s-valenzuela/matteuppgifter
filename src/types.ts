@@ -39,3 +39,23 @@ export interface Problem {
   /** Endast satt för division när allowRemainder är true. */
   remainder?: number;
 }
+
+/** Hur svarsfältet ritas när facit inte visas. */
+export type AnswerStyle = 'blank' | 'line' | 'box';
+
+export interface DocumentHeader {
+  title: string;
+  showName: boolean;
+  showDate: boolean;
+}
+
+export interface DocumentConfig {
+  header: DocumentHeader;
+  fontSizePt: number;
+  columns: number | 'auto';
+  answerStyle: AnswerStyle;
+  /** Lägg till facit-sidor sist i dokumentet. */
+  includeAnswerKey: boolean;
+  /** Visas i sidfoten så att bladet kan återskapas från samma GeneratorConfig. */
+  seed: number;
+}
