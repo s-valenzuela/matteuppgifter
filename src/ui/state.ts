@@ -40,6 +40,7 @@ export function createDefaultState(): AppState {
       header: { title: 'Matteuppgifter', showName: true, showDate: true },
       fontSizePt: 14,
       columns: 3,
+      layout: 'grid',
       answerStyle: 'blank',
       includeAnswerKey: true,
     },

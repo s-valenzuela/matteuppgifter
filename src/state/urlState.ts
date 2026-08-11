@@ -1,8 +1,9 @@
-import type { AnswerStyle, Operation, OperationConfig } from '../types';
+import type { AnswerStyle, DocumentLayout, Operation, OperationConfig } from '../types';
 import { createDefaultState, type AppState } from '../ui/state';
 
 const OPERATION_KEYS: readonly Operation[] = ['add', 'sub', 'mul', 'div'];
 const ANSWER_STYLES: readonly AnswerStyle[] = ['blank', 'line', 'box'];
+const DOCUMENT_LAYOUTS: readonly DocumentLayout[] = ['grid', 'vertical'];
 
 /**
  * Speglar AppState i en query-sträng så att ett blad kan delas eller
@@ -32,6 +33,7 @@ export function encodeState(state: AppState): URLSearchParams {
 
   params.set('cols', String(state.document.columns));
   params.set('fs', String(state.document.fontSizePt));
+  params.set('layout', state.document.layout);
   params.set('ans', state.document.answerStyle);
   params.set('facit', boolStr(state.document.includeAnswerKey));
   params.set('title', state.document.header.title);
@@ -66,6 +68,7 @@ export function decodeState(search: string): AppState | null {
 
   state.document.columns = decodeColumns(params.get('cols'), fallback.document.columns);
   state.document.fontSizePt = intOr(params.get('fs'), fallback.document.fontSizePt);
+  state.document.layout = decodeDocumentLayout(params.get('layout'), fallback.document.layout);
   state.document.answerStyle = decodeAnswerStyle(params.get('ans'), fallback.document.answerStyle);
   state.document.includeAnswerKey = boolOr(params.get('facit'), fallback.document.includeAnswerKey);
   state.document.header.title = params.get('title') ?? fallback.document.header.title;
@@ -135,6 +138,12 @@ function decodeColumns(raw: string | null, fallback: number | 'auto'): number | 
 function decodeAnswerStyle(raw: string | null, fallback: AnswerStyle): AnswerStyle {
   return raw !== null && (ANSWER_STYLES as readonly string[]).includes(raw)
     ? (raw as AnswerStyle)
+    : fallback;
+}
+
+function decodeDocumentLayout(raw: string | null, fallback: DocumentLayout): DocumentLayout {
+  return raw !== null && (DOCUMENT_LAYOUTS as readonly string[]).includes(raw)
+    ? (raw as DocumentLayout)
     : fallback;
 }
 

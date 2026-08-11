@@ -1,4 +1,4 @@
-import type { AnswerStyle, Operation } from '../types';
+import type { AnswerStyle, DocumentLayout, Operation } from '../types';
 import { LEVEL_PRESETS } from './presets';
 import type { AppState } from './state';
 
@@ -55,6 +55,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const columnsEl = q<HTMLSelectElement>(container, '#columns');
   const fontSizeEl = q<HTMLInputElement>(container, '#fontSize');
   const fontSizeValueEl = q<HTMLSpanElement>(container, '#fontSize-value');
+  const layoutEl = q<HTMLSelectElement>(container, '#layout');
   const answerStyleEl = q<HTMLSelectElement>(container, '#answerStyle');
   const includeAnswerKeyEl = q<HTMLInputElement>(container, '#includeAnswerKey');
 
@@ -90,6 +91,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     columnsEl.value = String(state.document.columns);
     fontSizeEl.value = String(state.document.fontSizePt);
     fontSizeValueEl.textContent = `${state.document.fontSizePt} pt`;
+    layoutEl.value = state.document.layout;
     answerStyleEl.value = state.document.answerStyle;
     includeAnswerKeyEl.checked = state.document.includeAnswerKey;
 
@@ -202,6 +204,10 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
       fontSizeValueEl.textContent = `${value} pt`;
       emitChange();
     }
+  });
+  layoutEl.addEventListener('change', () => {
+    state.document.layout = layoutEl.value as DocumentLayout;
+    emitChange();
   });
   answerStyleEl.addEventListener('change', () => {
     state.document.answerStyle = answerStyleEl.value as AnswerStyle;
@@ -325,6 +331,12 @@ function renderTemplate(): string {
             <option value="blank">Tomt streck</option>
             <option value="line">Linje</option>
             <option value="box">Ruta</option>
+          </select>
+        </label>
+        <label>Uppställning
+          <select id="layout">
+            <option value="grid">Vågrätt (12 + 7 = __)</option>
+            <option value="vertical">Stapling (tal under varandra)</option>
           </select>
         </label>
       </div>

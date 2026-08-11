@@ -1,7 +1,17 @@
 import { jsPDF } from 'jspdf';
 import type { DocumentConfig, Problem } from '../types';
 import { computeOperandDigitCounts, formatAnswer, OPERATION_SYMBOLS } from './format';
-import { A4_METRICS, computeGridLayout, type CellPosition, type GridLayout } from './layout';
+import {
+  A4_METRICS,
+  computeGridLayout,
+  MM_PER_PT,
+  VERTICAL_BOX_GAP_FACTOR,
+  VERTICAL_BOX_HEIGHT_FACTOR,
+  VERTICAL_LINE_STEP_FACTOR,
+  VERTICAL_RULE_GAP_FACTOR,
+  type CellPosition,
+  type GridLayout,
+} from './layout';
 
 const BLANK_PLACEHOLDER = '_______';
 const LINE_LENGTH_MM = 14;
@@ -51,6 +61,7 @@ export function renderProblemsToPdf(problems: Problem[], config: DocumentConfig)
     problemCount: problems.length,
     fontSizePt: config.fontSizePt,
     columns: config.columns,
+    layout: config.layout,
   });
 
   if (layout.pageCount === 0) {
@@ -150,6 +161,22 @@ function drawProblem(
   showAnswers: boolean,
   metrics: ProblemMetrics,
 ): void {
+  if (config.layout === 'vertical') {
+    drawVerticalProblem(doc, problem, position, config, showAnswers, metrics);
+  } else {
+    drawGridProblem(doc, problem, position, config, showAnswers, metrics);
+  }
+}
+
+/** Vågrätt: "12 + 7 = ____". */
+function drawGridProblem(
+  doc: jsPDF,
+  problem: Problem,
+  position: CellPosition,
+  config: DocumentConfig,
+  showAnswers: boolean,
+  metrics: ProblemMetrics,
+): void {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(config.fontSizePt);
 
@@ -194,5 +221,73 @@ function drawProblem(
     case 'box':
       doc.rect(answerX, position.yMm - BOX_SIZE_MM + 2, BOX_SIZE_MM, BOX_SIZE_MM);
       break;
+  }
+}
+
+/**
+ * Uppställning: talen staplade och högerjusterade mot samma kant, med
+ * operatorn i en egen fast kolumn till vänster (samma operatorSlotWidthMm
+ * som i drawGridProblem — annars skulle strecket hamna olika brett för +/-
+ * jämfört med ×/÷) och ett streck ovanför svaret:
+ *
+ *      12
+ *   +   7
+ *   ----
+ *      19
+ *
+ * position.yMm är, liksom i drawGridProblem, den sista radens baslinje (här:
+ * svaret) — layout.ts har reserverat exakt VERTICAL_LINE_STEP_FACTOR-höjd
+ * radavstånd ovanför den för operand 1 och operand 2, se computeGridLayout.
+ */
+function drawVerticalProblem(
+  doc: jsPDF,
+  problem: Problem,
+  position: CellPosition,
+  config: DocumentConfig,
+  showAnswers: boolean,
+  metrics: ProblemMetrics,
+): void {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(config.fontSizePt);
+
+  const fontSizeMm = config.fontSizePt * MM_PER_PT;
+  const lineStepMm = fontSizeMm * VERTICAL_LINE_STEP_FACTOR;
+  const operandColumnWidthMm = Math.max(metrics.slotAWidthMm, metrics.slotBWidthMm);
+  const rightEdgeX =
+    position.xMm + metrics.operatorSlotWidthMm + SYMBOL_GAP_MM + operandColumnWidthMm;
+
+  const answerY = position.yMm;
+  const operand2Y = answerY - lineStepMm;
+  const operand1Y = operand2Y - lineStepMm;
+  const ruleY = operand2Y + fontSizeMm * VERTICAL_RULE_GAP_FACTOR;
+
+  doc.text(String(problem.a), rightEdgeX, operand1Y, { align: 'right' });
+
+  const symbol = OPERATION_SYMBOLS[problem.op];
+  const symbolWidth = doc.getTextWidth(symbol);
+  doc.text(symbol, position.xMm + (metrics.operatorSlotWidthMm - symbolWidth) / 2, operand2Y);
+  doc.text(String(problem.b), rightEdgeX, operand2Y, { align: 'right' });
+
+  doc.line(position.xMm, ruleY, rightEdgeX, ruleY);
+
+  if (showAnswers) {
+    doc.text(formatAnswer(problem), rightEdgeX, answerY, { align: 'right' });
+    return;
+  }
+
+  // 'blank' och 'line' ritar inget extra — strecket ovanför är redan den
+  // sedvanliga platsen att skriva svaret för hand i en uppställning, precis
+  // som i en fysisk räknehäfte. 'box' ritar en ruta för svaret ändå, för den
+  // som vill ha en tydligare avgränsad yta. Rutans höjd (och luften runt den)
+  // skalar med teckenstorleken — layout.ts har reserverat radhöjd utifrån
+  // exakt samma faktorer (VERTICAL_BOX_GAP_FACTOR/VERTICAL_BOX_HEIGHT_FACTOR),
+  // så en fast mm-höjd hade kunnat glida isär och krocka med nästa uppgift.
+  if (config.answerStyle === 'box') {
+    doc.rect(
+      position.xMm,
+      ruleY + fontSizeMm * VERTICAL_BOX_GAP_FACTOR,
+      rightEdgeX - position.xMm,
+      fontSizeMm * VERTICAL_BOX_HEIGHT_FACTOR,
+    );
   }
 }

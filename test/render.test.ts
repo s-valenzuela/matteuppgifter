@@ -10,6 +10,7 @@ function baseDocumentConfig(overrides: Partial<DocumentConfig> = {}): DocumentCo
     header: { title: 'Matteuppgifter', showName: true, showDate: true },
     fontSizePt: 14,
     columns: 'auto',
+    layout: 'grid',
     answerStyle: 'blank',
     includeAnswerKey: false,
     seed: 1,
@@ -113,6 +114,53 @@ describe('renderProblemsToPdf', () => {
       const doc = renderProblemsToPdf(problems, baseDocumentConfig({ answerStyle }));
       expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
     }
+  });
+
+  it('fungerar i uppställningsläge för alla räknesätt, svarsstilar och med facit, utan att kasta fel', () => {
+    const problems = generateProblems(
+      baseConfig({
+        operations: {
+          add: opConfig({ enabled: true, operandRange: { min: 0, max: 100 } }),
+          sub: opConfig({ enabled: true, operandRange: { min: 0, max: 100 }, noNegative: true }),
+          mul: opConfig({ enabled: true, operandRange: { min: 0, max: 10 } }),
+          div: opConfig({ enabled: true, operandRange: { min: 1, max: 10 }, allowRemainder: true }),
+        },
+        count: 40,
+      }),
+    );
+
+    for (const answerStyle of ['blank', 'line', 'box'] as const) {
+      const doc = renderProblemsToPdf(
+        problems,
+        baseDocumentConfig({ layout: 'vertical', answerStyle, includeAnswerKey: true }),
+      );
+      expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+      expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it('matchar sidantalet från layout-beräkningen i uppställningsläge', () => {
+    const problems = generateProblems(
+      baseConfig({
+        operations: {
+          add: opConfig({ enabled: true, operandRange: { min: 0, max: 100 } }),
+          sub: opConfig(),
+          mul: opConfig(),
+          div: opConfig(),
+        },
+        count: 250,
+      }),
+    );
+    const config = baseDocumentConfig({ columns: 3, fontSizePt: 14, layout: 'vertical' });
+    const layout = computeGridLayout({
+      problemCount: problems.length,
+      fontSizePt: config.fontSizePt,
+      columns: config.columns,
+      layout: config.layout,
+    });
+
+    const doc = renderProblemsToPdf(problems, config);
+    expect(doc.getNumberOfPages()).toBe(layout.pageCount);
   });
 
   it('rundan runt-genererar en PDF för alla fyra räknesätt tillsammans, med rest och facit', () => {

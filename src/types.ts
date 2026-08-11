@@ -43,6 +43,12 @@ export interface Problem {
 /** Hur svarsfältet ritas när facit inte visas. */
 export type AnswerStyle = 'blank' | 'line' | 'box';
 
+/**
+ * 'grid' — vågrätt: "12 + 7 = ____". 'vertical' — uppställning med talen
+ * staplade och ett streck ovanför svaret, mer lämpat för större tal.
+ */
+export type DocumentLayout = 'grid' | 'vertical';
+
 export interface DocumentHeader {
   title: string;
   showName: boolean;
@@ -53,6 +59,7 @@ export interface DocumentConfig {
   header: DocumentHeader;
   fontSizePt: number;
   columns: number | 'auto';
+  layout: DocumentLayout;
   answerStyle: AnswerStyle;
   /** Lägg till facit-sidor sist i dokumentet. */
   includeAnswerKey: boolean;

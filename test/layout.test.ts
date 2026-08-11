@@ -78,4 +78,56 @@ describe('computeGridLayout', () => {
       expect(layout.positions[i].page).toBeGreaterThanOrEqual(layout.positions[i - 1].page);
     }
   });
+
+  describe('uppställningsläge (layout: "vertical")', () => {
+    it('reserverar mer radhöjd än det vågräta läget, för de tre staplade raderna', () => {
+      const grid = computeGridLayout({
+        problemCount: 1,
+        fontSizePt: 14,
+        columns: 3,
+        layout: 'grid',
+      });
+      const vertical = computeGridLayout({
+        problemCount: 1,
+        fontSizePt: 14,
+        columns: 3,
+        layout: 'vertical',
+      });
+      expect(vertical.rowHeightMm).toBeGreaterThan(grid.rowHeightMm * 1.5);
+    });
+
+    it('placerar aldrig innehåll utanför marginalerna', () => {
+      for (const columns of ['auto', 1, 2, 4, 6] as const) {
+        for (const fontSizePt of [10, 14, 24]) {
+          const layout = computeGridLayout({
+            problemCount: 97,
+            fontSizePt,
+            columns,
+            layout: 'vertical',
+          });
+          for (const p of layout.positions) {
+            expect(p.xMm).toBeGreaterThanOrEqual(A4_METRICS.marginMm);
+            expect(p.xMm + layout.columnWidthMm).toBeLessThanOrEqual(
+              A4_METRICS.pageWidthMm - A4_METRICS.marginMm + 1e-9,
+            );
+            expect(p.yMm).toBeGreaterThanOrEqual(A4_METRICS.marginMm + A4_METRICS.headerHeightMm);
+            expect(p.yMm).toBeLessThanOrEqual(
+              A4_METRICS.pageHeightMm - A4_METRICS.marginMm - A4_METRICS.footerHeightMm + 1e-9,
+            );
+          }
+        }
+      }
+    });
+
+    it('utelämnad layout beter sig som "grid" (bakåtkompatibelt)', () => {
+      const withoutLayout = computeGridLayout({ problemCount: 10, fontSizePt: 14, columns: 3 });
+      const explicitGrid = computeGridLayout({
+        problemCount: 10,
+        fontSizePt: 14,
+        columns: 3,
+        layout: 'grid',
+      });
+      expect(withoutLayout).toEqual(explicitGrid);
+    });
+  });
 });
