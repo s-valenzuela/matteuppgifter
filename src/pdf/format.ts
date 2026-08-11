@@ -12,10 +12,26 @@ export const OPERATION_SYMBOLS: Record<Operation, string> = {
   div: '÷',
 };
 
-/** T.ex. "12 + 7 =" — utan uppgiftsnummer och utan svar. */
-export function formatProblemPrompt(problem: Problem): string {
-  const symbol = OPERATION_SYMBOLS[problem.op];
-  return `${problem.a} ${symbol} ${problem.b} =`;
+export interface OperandDigitCounts {
+  a: number;
+  b: number;
+}
+
+/**
+ * Hur många siffror den bredaste operanden A respektive B behöver över alla
+ * uppgifter i dokumentet. render.ts använder det här för att högerjustera
+ * varje operand inom en gemensam kolumnbredd, så att operatorer och
+ * likhetstecken hamnar på samma x-position rad efter rad — annars hoppar de
+ * i sidled beroende på hur många siffror just den uppgiften råkar ha.
+ */
+export function computeOperandDigitCounts(problems: readonly Problem[]): OperandDigitCounts {
+  let a = 1;
+  let b = 1;
+  for (const problem of problems) {
+    a = Math.max(a, String(problem.a).length);
+    b = Math.max(b, String(problem.b).length);
+  }
+  return { a, b };
 }
 
 /** T.ex. "19", eller "5 r 2" när division har en rest. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatAnswer, formatProblemPrompt, OPERATION_SYMBOLS } from '../src/pdf/format';
+import { computeOperandDigitCounts, formatAnswer, OPERATION_SYMBOLS } from '../src/pdf/format';
 import type { Problem } from '../src/types';
 
 describe('OPERATION_SYMBOLS', () => {
@@ -7,29 +7,37 @@ describe('OPERATION_SYMBOLS', () => {
     const symbols = Object.values(OPERATION_SYMBOLS);
     expect(new Set(symbols).size).toBe(symbols.length);
   });
-});
 
-describe('formatProblemPrompt', () => {
-  it('formaterar addition', () => {
-    const problem: Problem = { op: 'add', a: 12, b: 7, answer: 19 };
-    expect(formatProblemPrompt(problem)).toBe('12 + 7 =');
-  });
-
-  it('formaterar subtraktion med ett vanligt bindestreck, inte minustecken', () => {
+  it('använder ett vanligt bindestreck för subtraktion, inte minustecken', () => {
     // U+2212 (minustecken) saknas i jsPDF:s WinAnsi-kodade Helvetica och gör
     // att svaret hamnar fel placerat på sidan — se render.ts.
-    const problem: Problem = { op: 'sub', a: 9, b: 4, answer: 5 };
-    expect(formatProblemPrompt(problem)).toBe('9 - 4 =');
+    expect(OPERATION_SYMBOLS.sub).toBe('-');
+  });
+});
+
+function problem(overrides: Partial<Problem>): Problem {
+  return { op: 'add', a: 0, b: 0, answer: 0, ...overrides };
+}
+
+describe('computeOperandDigitCounts', () => {
+  it('ger minst en siffra för en tom lista', () => {
+    expect(computeOperandDigitCounts([])).toEqual({ a: 1, b: 1 });
   });
 
-  it('formaterar multiplikation', () => {
-    const problem: Problem = { op: 'mul', a: 6, b: 7, answer: 42 };
-    expect(formatProblemPrompt(problem)).toBe('6 × 7 =');
+  it('ger minst en siffra när alla operander är ensiffriga', () => {
+    const problems = [problem({ a: 5, b: 3 }), problem({ a: 9, b: 1 })];
+    expect(computeOperandDigitCounts(problems)).toEqual({ a: 1, b: 1 });
   });
 
-  it('formaterar division med täljare och nämnare, inte kvoten', () => {
-    const problem: Problem = { op: 'div', a: 56, b: 8, answer: 7 };
-    expect(formatProblemPrompt(problem)).toBe('56 ÷ 8 =');
+  it('räknar a och b oberoende av varandra', () => {
+    const problems = [problem({ a: 5, b: 100 }), problem({ a: 23, b: 1 })];
+    // a: max(1, 2) = 2 siffror ("23"). b: max(3, 1) = 3 siffror ("100").
+    expect(computeOperandDigitCounts(problems)).toEqual({ a: 2, b: 3 });
+  });
+
+  it('tar hänsyn till alla uppgifter, inte bara den första eller sista', () => {
+    const problems = [problem({ a: 1, b: 1 }), problem({ a: 1234, b: 1 }), problem({ a: 1, b: 1 })];
+    expect(computeOperandDigitCounts(problems).a).toBe(4);
   });
 });
 

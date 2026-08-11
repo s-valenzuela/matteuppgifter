@@ -1,12 +1,49 @@
 import { jsPDF } from 'jspdf';
 import type { DocumentConfig, Problem } from '../types';
-import { formatAnswer, formatProblemPrompt } from './format';
+import { computeOperandDigitCounts, formatAnswer, OPERATION_SYMBOLS } from './format';
 import { A4_METRICS, computeGridLayout, type CellPosition, type GridLayout } from './layout';
 
 const BLANK_PLACEHOLDER = '_______';
 const LINE_LENGTH_MM = 14;
 const BOX_SIZE_MM = 7;
 const GAP_AFTER_PROMPT_MM = 2;
+/** Luft runt operatorn och likhetstecknet, i mm. */
+const SYMBOL_GAP_MM = 1.5;
+
+/**
+ * Mått som är gemensamma för alla uppgifter i dokumentet, så att operand A,
+ * operatorn, operand B och likhetstecknet hamnar på samma x-position rad
+ * efter rad oavsett hur många siffror den enskilda uppgiften har — se
+ * drawProblem(). Beror på jsPDF:s faktiska doc.getTextWidth() (siffror är
+ * lika breda i Helvetica, "tabular figures", men +/-/×/÷ är det INTE), så
+ * det här kan inte vara ren mm-matematik som layout.ts.
+ */
+interface ProblemMetrics {
+  slotAWidthMm: number;
+  slotBWidthMm: number;
+  operatorSlotWidthMm: number;
+}
+
+function computeProblemMetrics(
+  doc: jsPDF,
+  problems: Problem[],
+  fontSizePt: number,
+): ProblemMetrics {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(fontSizePt);
+
+  const digitWidthMm = doc.getTextWidth('0');
+  const digitCounts = computeOperandDigitCounts(problems);
+  const operatorSlotWidthMm = Math.max(
+    ...Object.values(OPERATION_SYMBOLS).map((symbol) => doc.getTextWidth(symbol)),
+  );
+
+  return {
+    slotAWidthMm: digitCounts.a * digitWidthMm,
+    slotBWidthMm: digitCounts.b * digitWidthMm,
+    operatorSlotWidthMm,
+  };
+}
 
 export function renderProblemsToPdf(problems: Problem[], config: DocumentConfig): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -23,11 +60,16 @@ export function renderProblemsToPdf(problems: Problem[], config: DocumentConfig)
     return doc;
   }
 
-  renderSection(doc, problems, layout, config, { showAnswers: false, sectionLabel: null });
+  const metrics = computeProblemMetrics(doc, problems, config.fontSizePt);
+
+  renderSection(doc, problems, layout, config, metrics, { showAnswers: false, sectionLabel: null });
 
   if (config.includeAnswerKey) {
     doc.addPage();
-    renderSection(doc, problems, layout, config, { showAnswers: true, sectionLabel: 'Facit' });
+    renderSection(doc, problems, layout, config, metrics, {
+      showAnswers: true,
+      sectionLabel: 'Facit',
+    });
   }
 
   return doc;
@@ -43,6 +85,7 @@ function renderSection(
   problems: Problem[],
   layout: GridLayout,
   config: DocumentConfig,
+  metrics: ProblemMetrics,
   options: SectionOptions,
 ): void {
   for (let page = 0; page < layout.pageCount; page++) {
@@ -52,7 +95,7 @@ function renderSection(
     drawHeader(doc, config, options.sectionLabel);
     for (const position of layout.positions) {
       if (position.page === page) {
-        drawProblem(doc, problems[position.index], position, config, options.showAnswers);
+        drawProblem(doc, problems[position.index], position, config, options.showAnswers, metrics);
       }
     }
     drawFooter(doc, page, layout.pageCount, config.seed);
@@ -105,14 +148,36 @@ function drawProblem(
   position: CellPosition,
   config: DocumentConfig,
   showAnswers: boolean,
+  metrics: ProblemMetrics,
 ): void {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(config.fontSizePt);
 
-  const prompt = formatProblemPrompt(problem);
-  doc.text(prompt, position.xMm, position.yMm);
+  // Operand A högerjusteras mot slutet av sin kolumn ...
+  const aX = position.xMm + metrics.slotAWidthMm;
+  doc.text(String(problem.a), aX, position.yMm, { align: 'right' });
 
-  const answerX = position.xMm + doc.getTextWidth(prompt) + GAP_AFTER_PROMPT_MM;
+  // ... operatorn centreras i en egen fast bred kolumn (+/-/×/÷ är inte lika
+  // breda i Helvetica, så utan det här skulle likhetstecknet hoppa i sidled
+  // beroende på vilket räknesätt just den raden råkar vara) ...
+  const symbol = OPERATION_SYMBOLS[problem.op];
+  const symbolSlotStartX = aX + SYMBOL_GAP_MM;
+  const symbolWidth = doc.getTextWidth(symbol);
+  doc.text(
+    symbol,
+    symbolSlotStartX + (metrics.operatorSlotWidthMm - symbolWidth) / 2,
+    position.yMm,
+  );
+
+  // ... och operand B högerjusteras på samma sätt som A, så att både + och =
+  // hamnar på samma x-position rad efter rad genom hela dokumentet.
+  const bX = symbolSlotStartX + metrics.operatorSlotWidthMm + SYMBOL_GAP_MM + metrics.slotBWidthMm;
+  doc.text(String(problem.b), bX, position.yMm, { align: 'right' });
+
+  const equalsX = bX + SYMBOL_GAP_MM;
+  doc.text('=', equalsX, position.yMm);
+
+  const answerX = equalsX + doc.getTextWidth('=') + GAP_AFTER_PROMPT_MM;
 
   if (showAnswers) {
     doc.text(formatAnswer(problem), answerX, position.yMm);
