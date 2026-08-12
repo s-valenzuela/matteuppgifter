@@ -84,6 +84,24 @@ h1 {
   font-size: 1.6rem;
 }
 
+.about {
+  max-width: 65ch;
+  margin: 2.5rem 0 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-panel);
+}
+
+.about h2 {
+  font-size: 1.15rem;
+  margin: 0 0 0.75rem;
+}
+
+.about p {
+  margin: 0 0 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
 .subtitle {
   margin: 0 0 1.25rem;
   color: var(--text-muted);
