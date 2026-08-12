@@ -1,4 +1,4 @@
-import type { AppState } from '../ui/state';
+import { createDefaultState, type AppState } from '../ui/state';
 
 const STORAGE_KEY = 'matteuppgifter:state:v1';
 
@@ -13,10 +13,26 @@ export function loadState(): AppState | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
-    return isAppState(parsed) ? parsed : null;
+    return isAppState(parsed) ? normalizeState(parsed) : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Fyller på sheetType/clock för ett tillstånd sparat innan klockfunktionen
+ * fanns — isAppState() nedan är en medvetet ytlig kontroll som INTE känner av
+ * dessa fält, så ett äldre sparat tillstånd passar igenom den och skulle
+ * annars komma tillbaka med sheetType/clock som undefined.
+ */
+function normalizeState(state: AppState): AppState {
+  const fallback = createDefaultState();
+  return {
+    sheetType: state.sheetType === 'clock' ? 'clock' : 'arithmetic',
+    generator: state.generator,
+    clock: state.clock ?? fallback.clock,
+    document: state.document,
+  };
 }
 
 export function saveState(state: AppState): void {

@@ -72,3 +72,50 @@ export interface DocumentConfig {
   /** Visas i sidfoten så att bladet kan återskapas från samma GeneratorConfig. */
   seed: number;
 }
+
+/** Vilken typ av blad som ska genereras — styr vilken av generator/clock som används. */
+export type SheetType = 'arithmetic' | 'clock';
+
+/**
+ * Hur finmaskigt minuterna väljs. 'hour' ger bara hela timmar, 'five' alla 12
+ * femminuterssteg — se core/clock.ts för den svenska frastabellen.
+ */
+export type ClockStep = 'hour' | 'half' | 'quarter' | 'five';
+
+/**
+ * :20 och :40 har två fullt korrekta svenska varianter. 'halv' använder samma
+ * halv-ankare som :25/:35 ("tio i halv fyra"/"tio över halv fyra"), 'over-i'
+ * den enklare över/i-formen ("tjugo över tre"/"tjugo i fyra"). Påverkar bara
+ * dessa två minuter — resten av frastabellen är entydig.
+ */
+export type TwentyFortyPhrasing = 'halv' | 'over-i';
+
+/** 'read' — läs av en urtavla med visare, skriv tiden i ord. 'draw' — given
+ * tid i ord, rita visarna på en tom urtavla. */
+export type ClockDirection = 'read' | 'draw';
+
+/** 'mixed' slumpar riktning per uppgift, se core/clock.ts. */
+export type ClockDirectionMode = ClockDirection | 'mixed';
+
+export interface ClockProblem {
+  /** 1–12, som på urtavlan (inte 0–23). */
+  hour: number;
+  /** 0–55, alltid en multipel av 5. */
+  minute: number;
+  direction: ClockDirection;
+}
+
+export interface ClockGeneratorConfig {
+  step: ClockStep;
+  twentyFortyPhrasing: TwentyFortyPhrasing;
+  direction: ClockDirectionMode;
+  showNumerals: boolean;
+  showMinuteTicks: boolean;
+  /** Totalt antal uppgifter att generera. */
+  count: number;
+  /** Undvik dubbletter (samma timme och minut) så länge steget rymmer tillräckligt många unika tider. */
+  avoidDuplicates: boolean;
+  /** Visas i sidfoten så att bladet kan återskapas — separat från generator.seed
+   * eftersom klockblad och räknesättsblad är oberoende av varandra (se ui/state.ts). */
+  seed: number;
+}

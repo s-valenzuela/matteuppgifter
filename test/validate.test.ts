@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { validateConfig } from '../src/core/validate';
+import { validateClockConfig, validateConfig } from '../src/core/validate';
+import type { ClockGeneratorConfig } from '../src/types';
 import { baseConfig, opConfig } from './helpers';
+
+function baseClockConfig(overrides: Partial<ClockGeneratorConfig> = {}): ClockGeneratorConfig {
+  return {
+    step: 'five',
+    twentyFortyPhrasing: 'halv',
+    direction: 'read',
+    showNumerals: true,
+    showMinuteTicks: false,
+    count: 12,
+    avoidDuplicates: true,
+    seed: 1,
+    ...overrides,
+  };
+}
 
 describe('validateConfig', () => {
   it('varnar när inget räknesätt är valt', () => {
@@ -91,6 +106,31 @@ describe('validateConfig', () => {
     });
 
     const { warnings } = validateConfig(config);
+    expect(warnings).toHaveLength(0);
+  });
+});
+
+describe('validateClockConfig', () => {
+  it('normaliserar ett negativt antal till 0 och varnar', () => {
+    const { config, warnings } = validateClockConfig(baseClockConfig({ count: -3 }));
+    expect(config.count).toBe(0);
+    expect(warnings.some((w) => w.includes('Antalet uppgifter'))).toBe(true);
+  });
+
+  it('varnar när avoidDuplicates inte kan tillgodoses av det valda steget', () => {
+    const { warnings } = validateClockConfig(baseClockConfig({ step: 'hour', count: 30 }));
+    expect(warnings.some((w) => w.includes('12 unika klockslag'))).toBe(true);
+  });
+
+  it('varnar inte när steget rymmer tillräckligt många unika klockslag', () => {
+    const { warnings } = validateClockConfig(baseClockConfig({ step: 'five', count: 30 }));
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('varnar inte när avoidDuplicates är avstängt, oavsett antal', () => {
+    const { warnings } = validateClockConfig(
+      baseClockConfig({ step: 'hour', count: 100, avoidDuplicates: false }),
+    );
     expect(warnings).toHaveLength(0);
   });
 });

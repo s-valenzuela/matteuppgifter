@@ -1,7 +1,19 @@
-import type { GeneratorConfig, Operation, OperationConfig, Range } from '../types';
+import { clockPoolSize } from './clock';
+import type {
+  ClockGeneratorConfig,
+  GeneratorConfig,
+  Operation,
+  OperationConfig,
+  Range,
+} from '../types';
 
 export interface ValidationResult {
   config: GeneratorConfig;
+  warnings: string[];
+}
+
+export interface ClockValidationResult {
+  config: ClockGeneratorConfig;
   warnings: string[];
 }
 
@@ -48,6 +60,31 @@ export function validateConfig(input: GeneratorConfig): ValidationResult {
     config: { ...input, operations, count },
     warnings,
   };
+}
+
+/**
+ * Motsvarigheten till validateConfig för klockblad — samma idé (räta ut,
+ * varna), men mycket enklare eftersom det bara finns en "operation" (steget)
+ * att kontrollera poolstorlek för, se core/clock.ts.
+ */
+export function validateClockConfig(input: ClockGeneratorConfig): ClockValidationResult {
+  const warnings: string[] = [];
+  const count = normalizeCount(input.count);
+  if (count !== input.count) {
+    warnings.push('Antalet uppgifter justerades till ett positivt heltal.');
+  }
+
+  if (input.avoidDuplicates && count > 0) {
+    const poolSize = clockPoolSize(input.step);
+    if (poolSize < count) {
+      warnings.push(
+        `Det valda steget rymmer bara ${poolSize} unika klockslag, men ${count} efterfrågas — ` +
+          'uppgifter kommer att upprepas.',
+      );
+    }
+  }
+
+  return { config: { ...input, count }, warnings };
 }
 
 function normalizeOperationConfig(config: OperationConfig): OperationConfig {

@@ -1,11 +1,13 @@
-import { renderProblemsToPdf } from '../pdf/render';
-import type { DocumentConfig, Problem } from '../types';
+import type { jsPDF } from 'jspdf';
 
 const DEBOUNCE_MS = 300;
 
 export interface PreviewController {
-  /** Schemalägger en ny rendering. Debouncad — snabba ändringar i följd ritar bara en gång. */
-  update(problems: Problem[], documentConfig: DocumentConfig): void;
+  /** Schemalägger en ny rendering. Debouncad — snabba ändringar i följd
+   * ritar bara en gång. Tar en byggfunktion snarare än färdiga
+   * problems/config så att den här modulen inte behöver veta om bladet är
+   * ett räknesätts- eller klockblad — det avgörs av anroparen (main.ts). */
+  update(buildDoc: () => jsPDF): void;
   destroy(): void;
 }
 
@@ -21,8 +23,8 @@ export function mountPreview(iframe: HTMLIFrameElement): PreviewController {
   let timeoutId: number | undefined;
   let currentObjectUrl: string | undefined;
 
-  function renderNow(problems: Problem[], documentConfig: DocumentConfig): void {
-    const doc = renderProblemsToPdf(problems, documentConfig);
+  function renderNow(buildDoc: () => jsPDF): void {
+    const doc = buildDoc();
     // jsPDF:s typer (types/index.d.ts) säger att output('bloburl') returnerar
     // ett URL-objekt, men i den faktiska implementationen är det bara
     // URL.createObjectURL()'s returvärde — en sträng, enligt webbstandarden.
@@ -38,11 +40,11 @@ export function mountPreview(iframe: HTMLIFrameElement): PreviewController {
   }
 
   return {
-    update(problems, documentConfig) {
+    update(buildDoc) {
       if (timeoutId !== undefined) {
         window.clearTimeout(timeoutId);
       }
-      timeoutId = window.setTimeout(() => renderNow(problems, documentConfig), DEBOUNCE_MS);
+      timeoutId = window.setTimeout(() => renderNow(buildDoc), DEBOUNCE_MS);
     },
     destroy() {
       if (timeoutId !== undefined) {

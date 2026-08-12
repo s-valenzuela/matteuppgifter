@@ -1,9 +1,23 @@
-import type { AnswerStyle, DocumentLayout, Operation, OperationConfig, Range } from '../types';
+import type {
+  AnswerStyle,
+  ClockDirectionMode,
+  ClockStep,
+  DocumentLayout,
+  Operation,
+  OperationConfig,
+  Range,
+  SheetType,
+  TwentyFortyPhrasing,
+} from '../types';
 import { createDefaultState, type AppState } from '../ui/state';
 
 const OPERATION_KEYS: readonly Operation[] = ['add', 'sub', 'mul', 'div'];
 const ANSWER_STYLES: readonly AnswerStyle[] = ['blank', 'line', 'box'];
 const DOCUMENT_LAYOUTS: readonly DocumentLayout[] = ['grid', 'vertical'];
+const SHEET_TYPES: readonly SheetType[] = ['arithmetic', 'clock'];
+const CLOCK_STEPS: readonly ClockStep[] = ['hour', 'half', 'quarter', 'five'];
+const CLOCK_PHRASINGS: readonly TwentyFortyPhrasing[] = ['halv', 'over-i'];
+const CLOCK_DIRECTIONS: readonly ClockDirectionMode[] = ['read', 'draw', 'mixed'];
 
 /**
  * Speglar AppState i en query-sträng så att ett blad kan delas eller
@@ -15,6 +29,13 @@ const DOCUMENT_LAYOUTS: readonly DocumentLayout[] = ['grid', 'vertical'];
  */
 export function encodeState(state: AppState): URLSearchParams {
   const params = new URLSearchParams();
+
+  // 'arithmetic' skrivs inte ut — det är standardvärdet och gör att äldre,
+  // redan delade länkar (från innan klockfunktionen fanns) fortsätter fungera
+  // oförändrat, se decodeState.
+  if (state.sheetType === 'clock') {
+    params.set('type', 'clock');
+  }
 
   for (const key of OPERATION_KEYS) {
     const cfg = state.generator.operations[key];
@@ -41,6 +62,15 @@ export function encodeState(state: AppState): URLSearchParams {
   params.set('name', boolStr(state.document.header.showName));
   params.set('date', boolStr(state.document.header.showDate));
 
+  params.set('cstep', state.clock.step);
+  params.set('cphr', state.clock.twentyFortyPhrasing);
+  params.set('cdir', state.clock.direction);
+  params.set('cnum', boolStr(state.clock.showNumerals));
+  params.set('cticks', boolStr(state.clock.showMinuteTicks));
+  params.set('cn', String(state.clock.count));
+  params.set('cdup', boolStr(state.clock.avoidDuplicates));
+  params.set('cseed', String(state.clock.seed));
+
   return params;
 }
 
@@ -53,6 +83,10 @@ export function decodeState(search: string): AppState | null {
 
   const fallback = createDefaultState();
   const state = createDefaultState();
+
+  // Frånvarande 'type' betyder 'arithmetic' — det gör att alla länkar delade
+  // innan klockfunktionen fanns fortsätter återskapa exakt samma blad.
+  state.sheetType = decodeSheetType(params.get('type'), fallback.sheetType);
 
   for (const key of OPERATION_KEYS) {
     const raw = params.get(key);
@@ -77,7 +111,49 @@ export function decodeState(search: string): AppState | null {
   state.document.header.showName = boolOr(params.get('name'), fallback.document.header.showName);
   state.document.header.showDate = boolOr(params.get('date'), fallback.document.header.showDate);
 
+  state.clock.step = decodeClockStep(params.get('cstep'), fallback.clock.step);
+  state.clock.twentyFortyPhrasing = decodeClockPhrasing(
+    params.get('cphr'),
+    fallback.clock.twentyFortyPhrasing,
+  );
+  state.clock.direction = decodeClockDirection(params.get('cdir'), fallback.clock.direction);
+  state.clock.showNumerals = boolOr(params.get('cnum'), fallback.clock.showNumerals);
+  state.clock.showMinuteTicks = boolOr(params.get('cticks'), fallback.clock.showMinuteTicks);
+  state.clock.count = intOr(params.get('cn'), fallback.clock.count);
+  state.clock.avoidDuplicates = boolOr(params.get('cdup'), fallback.clock.avoidDuplicates);
+  state.clock.seed = intOr(params.get('cseed'), fallback.clock.seed);
+
   return state;
+}
+
+function decodeSheetType(raw: string | null, fallback: SheetType): SheetType {
+  return raw !== null && (SHEET_TYPES as readonly string[]).includes(raw)
+    ? (raw as SheetType)
+    : fallback;
+}
+
+function decodeClockStep(raw: string | null, fallback: ClockStep): ClockStep {
+  return raw !== null && (CLOCK_STEPS as readonly string[]).includes(raw)
+    ? (raw as ClockStep)
+    : fallback;
+}
+
+function decodeClockPhrasing(
+  raw: string | null,
+  fallback: TwentyFortyPhrasing,
+): TwentyFortyPhrasing {
+  return raw !== null && (CLOCK_PHRASINGS as readonly string[]).includes(raw)
+    ? (raw as TwentyFortyPhrasing)
+    : fallback;
+}
+
+function decodeClockDirection(
+  raw: string | null,
+  fallback: ClockDirectionMode,
+): ClockDirectionMode {
+  return raw !== null && (CLOCK_DIRECTIONS as readonly string[]).includes(raw)
+    ? (raw as ClockDirectionMode)
+    : fallback;
 }
 
 function encodeOperation(key: Operation, cfg: OperationConfig): string {

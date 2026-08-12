@@ -18,6 +18,7 @@ describe('encodeState / decodeState', () => {
     // samma som standardkonfigurationens, så att hela AppState ändå kan
     // jämföras exakt efter en tur-och-retur.
     const state: AppState = {
+      sheetType: 'arithmetic',
       generator: {
         operations: {
           add: { enabled: false, operandRange: { min: 0, max: 20 } },
@@ -31,6 +32,7 @@ describe('encodeState / decodeState', () => {
         missingNumber: false,
         seed: 987654,
       },
+      clock: createDefaultState().clock,
       document: {
         header: { title: 'Läxa vecka 3', showName: false, showDate: true },
         fontSizePt: 20,
@@ -51,6 +53,7 @@ describe('encodeState / decodeState', () => {
     // blad", dvs samma Problem[] — inte nödvändigtvis varenda dolt UI-fält för
     // ett räknesätt som ändå är avstängt och därmed inte påverkar bladet.
     const state: AppState = {
+      sheetType: 'arithmetic',
       generator: {
         operations: {
           add: { enabled: false, operandRange: { min: 3, max: 999 } },
@@ -64,6 +67,7 @@ describe('encodeState / decodeState', () => {
         missingNumber: true,
         seed: 987654,
       },
+      clock: createDefaultState().clock,
       document: {
         header: { title: 'Läxa vecka 3', showName: false, showDate: true },
         fontSizePt: 20,
@@ -154,5 +158,46 @@ describe('encodeState / decodeState', () => {
     state.generator.missingNumber = true;
     const decoded = decodeState(`?${encodeState(state).toString()}`);
     expect(decoded?.generator.missingNumber).toBe(true);
+  });
+
+  describe('klockblad', () => {
+    it('en länk utan "type" betyder alltid "arithmetic" (bakåtkompatibelt med länkar från innan klockan fanns)', () => {
+      const decoded = decodeState('?add=0:10&n=5&seed=1');
+      expect(decoded?.sheetType).toBe('arithmetic');
+    });
+
+    it('en avkodad standardkonfiguration för klockblad återskapar exakt samma AppState', () => {
+      const state = createDefaultState();
+      state.sheetType = 'clock';
+      const decoded = decodeState(`?${encodeState(state).toString()}`);
+      expect(decoded).toEqual(state);
+    });
+
+    it('kodar och avkodar alla klockinställningar genom en tur-och-retur', () => {
+      const state = createDefaultState();
+      state.sheetType = 'clock';
+      state.clock = {
+        step: 'five',
+        twentyFortyPhrasing: 'over-i',
+        direction: 'mixed',
+        showNumerals: false,
+        showMinuteTicks: true,
+        count: 24,
+        avoidDuplicates: false,
+        seed: 555,
+      };
+
+      const decoded = decodeState(`?${encodeState(state).toString()}`);
+      expect(decoded?.clock).toEqual(state.clock);
+      expect(decoded?.sheetType).toBe('clock');
+    });
+
+    it('sätter footer-seeden från clock.seed, inte generator.seed, när sheetType är "clock"', () => {
+      const state = createDefaultState();
+      state.sheetType = 'clock';
+      state.clock.seed = 111;
+      state.generator.seed = 222;
+      expect(toDocumentConfig(state).seed).toBe(111);
+    });
   });
 });

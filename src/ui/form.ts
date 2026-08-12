@@ -1,4 +1,12 @@
-import type { AnswerStyle, DocumentLayout, Operation } from '../types';
+import type {
+  AnswerStyle,
+  ClockDirectionMode,
+  ClockStep,
+  DocumentLayout,
+  Operation,
+  SheetType,
+  TwentyFortyPhrasing,
+} from '../types';
 import { LEVEL_PRESETS } from './presets';
 import type { AppState } from './state';
 
@@ -10,6 +18,19 @@ const OPERATION_LABELS: Record<Operation, string> = {
 };
 
 const OPERATION_KEYS: readonly Operation[] = ['add', 'sub', 'mul', 'div'];
+
+const CLOCK_STEP_LABELS: Record<ClockStep, string> = {
+  hour: 'Hel timme',
+  half: 'Hel och halv',
+  quarter: 'Kvart (hel, kvart, halv, kvart i)',
+  five: 'Var femte minut',
+};
+
+const CLOCK_DIRECTION_LABELS: Record<ClockDirectionMode, string> = {
+  read: 'Läs av klockan (skriv tiden i ord)',
+  draw: 'Rita visarna (given tid i ord)',
+  mixed: 'Blandat',
+};
 
 // Feather-ikon (MIT), inbäddad som inline-SVG istället för en extern ikonfil
 // eftersom appen inte har några andra tillgångar att ladda in.
@@ -31,6 +52,19 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   let state = initialState;
   const listeners: Array<(state: AppState) => void> = [];
 
+  const sheetTypeRadios = Array.from(
+    q<HTMLDivElement>(container, '#sheet-type-toggle').querySelectorAll<HTMLInputElement>(
+      'input[type=radio]',
+    ),
+  );
+
+  const operationsSection = q<HTMLElement>(container, '#operations-section');
+  const layoutField = q<HTMLElement>(container, '#layout-field');
+  const missingNumberField = q<HTMLElement>(container, '#missingNumber-field');
+  const shuffleField = q<HTMLElement>(container, '#shuffle-field');
+  const clockSection = q<HTMLElement>(container, '#clock-section');
+  const clockPhrasingField = q<HTMLElement>(container, '#clock-phrasing-field');
+
   const operationEls = new Map(
     OPERATION_KEYS.map((key) => [
       key,
@@ -47,6 +81,12 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const subNoNegative = q<HTMLInputElement>(container, '#op-sub-noNegative');
   const mulTables = q<HTMLInputElement>(container, '#op-mul-tables');
   const divAllowRemainder = q<HTMLInputElement>(container, '#op-div-allowRemainder');
+
+  const clockStepEl = q<HTMLSelectElement>(container, '#clock-step');
+  const clockPhrasingEl = q<HTMLSelectElement>(container, '#clock-phrasing');
+  const clockDirectionEl = q<HTMLSelectElement>(container, '#clock-direction');
+  const clockShowNumeralsEl = q<HTMLInputElement>(container, '#clock-showNumerals');
+  const clockShowMinuteTicksEl = q<HTMLInputElement>(container, '#clock-showMinuteTicks');
 
   const countEl = q<HTMLInputElement>(container, '#count');
   const avoidDuplicatesEl = q<HTMLInputElement>(container, '#avoidDuplicates');
@@ -72,7 +112,20 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     }
   }
 
+  function isClock(): boolean {
+    return state.sheetType === 'clock';
+  }
+
   function refreshFromState(): void {
+    for (const radio of sheetTypeRadios) {
+      radio.checked = radio.value === state.sheetType;
+    }
+    operationsSection.hidden = isClock();
+    layoutField.hidden = isClock();
+    missingNumberField.hidden = isClock();
+    shuffleField.hidden = isClock();
+    clockSection.hidden = !isClock();
+
     for (const key of OPERATION_KEYS) {
       const cfg = state.generator.operations[key];
       const els = operationEls.get(key);
@@ -87,11 +140,20 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     mulTables.value = state.generator.operations.mul.tables?.join(',') ?? '';
     divAllowRemainder.checked = state.generator.operations.div.allowRemainder ?? false;
 
-    countEl.value = String(state.generator.count);
-    avoidDuplicatesEl.checked = state.generator.avoidDuplicates;
+    clockStepEl.value = state.clock.step;
+    clockPhrasingEl.value = state.clock.twentyFortyPhrasing;
+    clockPhrasingField.hidden = state.clock.step !== 'five';
+    clockDirectionEl.value = state.clock.direction;
+    clockShowNumeralsEl.checked = state.clock.showNumerals;
+    clockShowMinuteTicksEl.checked = state.clock.showMinuteTicks;
+
+    countEl.value = String(isClock() ? state.clock.count : state.generator.count);
+    avoidDuplicatesEl.checked = isClock()
+      ? state.clock.avoidDuplicates
+      : state.generator.avoidDuplicates;
     shuffleEl.checked = state.generator.shuffle;
     missingNumberEl.checked = state.generator.missingNumber;
-    seedEl.value = String(state.generator.seed);
+    seedEl.value = String(isClock() ? state.clock.seed : state.generator.seed);
     seedEl.readOnly = true;
 
     columnsEl.value = String(state.document.columns);
@@ -104,6 +166,16 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     titleEl.value = state.document.header.title;
     showNameEl.checked = state.document.header.showName;
     showDateEl.checked = state.document.header.showDate;
+  }
+
+  for (const radio of sheetTypeRadios) {
+    radio.addEventListener('change', () => {
+      if (radio.checked) {
+        state.sheetType = radio.value as SheetType;
+        refreshFromState();
+        emitChange();
+      }
+    });
   }
 
   for (const key of OPERATION_KEYS) {
@@ -180,15 +252,48 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     });
   }
 
+  clockStepEl.addEventListener('change', () => {
+    state.clock.step = clockStepEl.value as ClockStep;
+    refreshFromState();
+    emitChange();
+  });
+  clockPhrasingEl.addEventListener('change', () => {
+    state.clock.twentyFortyPhrasing = clockPhrasingEl.value as TwentyFortyPhrasing;
+    emitChange();
+  });
+  clockDirectionEl.addEventListener('change', () => {
+    state.clock.direction = clockDirectionEl.value as ClockDirectionMode;
+    emitChange();
+  });
+  clockShowNumeralsEl.addEventListener('change', () => {
+    state.clock.showNumerals = clockShowNumeralsEl.checked;
+    emitChange();
+  });
+  clockShowMinuteTicksEl.addEventListener('change', () => {
+    state.clock.showMinuteTicks = clockShowMinuteTicksEl.checked;
+    emitChange();
+  });
+
+  // "Antal uppgifter"/"Undvik dubbletter" är samma synliga fält för båda
+  // bladtyperna (se AppState-kommentaren i ui/state.ts), men skriver till
+  // generator eller clock beroende på vilken typ som är aktiv just nu.
   countEl.addEventListener('input', () => {
     const value = Number(countEl.value);
     if (Number.isFinite(value)) {
-      state.generator.count = value;
+      if (isClock()) {
+        state.clock.count = value;
+      } else {
+        state.generator.count = value;
+      }
       emitChange();
     }
   });
   avoidDuplicatesEl.addEventListener('change', () => {
-    state.generator.avoidDuplicates = avoidDuplicatesEl.checked;
+    if (isClock()) {
+      state.clock.avoidDuplicates = avoidDuplicatesEl.checked;
+    } else {
+      state.generator.avoidDuplicates = avoidDuplicatesEl.checked;
+    }
     emitChange();
   });
   shuffleEl.addEventListener('change', () => {
@@ -214,13 +319,17 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
       seedEl.value = digitsOnly;
     }
     if (digitsOnly !== '') {
-      state.generator.seed = Number(digitsOnly);
+      if (isClock()) {
+        state.clock.seed = Number(digitsOnly);
+      } else {
+        state.generator.seed = Number(digitsOnly);
+      }
       emitChange();
     }
   });
   seedEl.addEventListener('blur', () => {
     seedEl.readOnly = true;
-    seedEl.value = String(state.generator.seed);
+    seedEl.value = String(isClock() ? state.clock.seed : state.generator.seed);
   });
 
   columnsEl.addEventListener('change', () => {
@@ -272,7 +381,13 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
       emitChange();
     },
     randomizeSeed: () => {
-      state.generator.seed = Math.floor(Math.random() * 1_000_000);
+      // Slumpar båda bladtypernas seed tillsammans, så att den delade
+      // seed-knappen/fältet ger ett förutsägbart resultat oavsett vilken typ
+      // som råkar vara aktiv — de driver annars annars isär vid manuell
+      // redigering av seed-fältet, se seedEl:s input-hanterare ovan.
+      const seed = Math.floor(Math.random() * 1_000_000);
+      state.generator.seed = seed;
+      state.clock.seed = seed;
       refreshFromState();
       emitChange();
     },
@@ -315,8 +430,25 @@ function renderTemplate(): string {
       `<button type="button" data-min="${min}" data-max="${max}">${label}</button>`,
   ).join('');
 
+  const clockStepOptions = (Object.entries(CLOCK_STEP_LABELS) as [ClockStep, string][])
+    .map(([value, label]) => `<option value="${value}">${label}</option>`)
+    .join('');
+  const clockDirectionOptions = (
+    Object.entries(CLOCK_DIRECTION_LABELS) as [ClockDirectionMode, string][]
+  )
+    .map(([value, label]) => `<option value="${value}">${label}</option>`)
+    .join('');
+
   return `
-    <section aria-labelledby="operations-heading">
+    <section aria-labelledby="sheettype-heading">
+      <h2 id="sheettype-heading">Typ av blad</h2>
+      <div class="sheet-type-toggle" id="sheet-type-toggle">
+        <label><input type="radio" name="sheetType" value="arithmetic" /> Räknesätt</label>
+        <label><input type="radio" name="sheetType" value="clock" /> Klockan</label>
+      </div>
+    </section>
+
+    <section aria-labelledby="operations-heading" id="operations-section">
       <h2 id="operations-heading">Räknesätt</h2>
       <div class="level-chips" id="level-chips">
         <span class="level-chips-label">Nivå för alla räknesätt:</span>
@@ -338,6 +470,28 @@ function renderTemplate(): string {
           'div',
           `<label class="op-extra"><input type="checkbox" id="op-div-allowRemainder" /> Tillåt rest</label>`,
         )}
+      </div>
+    </section>
+
+    <section aria-labelledby="clock-heading" id="clock-section">
+      <h2 id="clock-heading">Klockan</h2>
+      <div class="field-grid">
+        <label>Steg
+          <select id="clock-step">${clockStepOptions}</select>
+        </label>
+        <label id="clock-phrasing-field">Fras för :20 och :40
+          <select id="clock-phrasing">
+            <option value="halv">tio i halv / tio över halv</option>
+            <option value="over-i">tjugo över / tjugo i</option>
+          </select>
+        </label>
+        <label>Riktning
+          <select id="clock-direction">${clockDirectionOptions}</select>
+        </label>
+      </div>
+      <div class="field-grid">
+        <label><input type="checkbox" id="clock-showNumerals" /> Visa siffror på urtavlan</label>
+        <label><input type="checkbox" id="clock-showMinuteTicks" /> Visa minutstreck</label>
       </div>
     </section>
 
@@ -367,7 +521,7 @@ function renderTemplate(): string {
             <option value="box">Ruta</option>
           </select>
         </label>
-        <label>Uppställning
+        <label id="layout-field">Uppställning
           <select id="layout">
             <option value="grid">Vågrätt (12 + 7 = __)</option>
             <option value="vertical">Stapling (tal under varandra)</option>
@@ -384,8 +538,8 @@ function renderTemplate(): string {
         <label><input type="checkbox" id="showName" /> Namn-fält</label>
         <label><input type="checkbox" id="showDate" /> Datum-fält</label>
         <label><input type="checkbox" id="avoidDuplicates" /> Undvik dubbletter</label>
-        <label><input type="checkbox" id="shuffle" /> Blanda ordningen</label>
-        <label><input type="checkbox" id="missingNumber" /> Saknat tal (t.ex. 3 + __ = 10)</label>
+        <label id="shuffle-field"><input type="checkbox" id="shuffle" /> Blanda ordningen</label>
+        <label id="missingNumber-field"><input type="checkbox" id="missingNumber" /> Saknat tal (t.ex. 3 + __ = 10)</label>
       </div>
       <label>
         Seed
