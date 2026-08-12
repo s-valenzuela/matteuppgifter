@@ -130,4 +130,86 @@ describe('computeGridLayout', () => {
       expect(withoutLayout).toEqual(explicitGrid);
     });
   });
+
+  describe('klockläge (layout: "clock")', () => {
+    it('sätter en positiv clockDiameterMm, bara för klockläget', () => {
+      const clock = computeGridLayout({
+        problemCount: 10,
+        fontSizePt: 14,
+        columns: 3,
+        layout: 'clock',
+      });
+      expect(clock.clockDiameterMm).toBeGreaterThan(0);
+
+      const grid = computeGridLayout({
+        problemCount: 10,
+        fontSizePt: 14,
+        columns: 3,
+        layout: 'grid',
+      });
+      expect(grid.clockDiameterMm).toBeUndefined();
+    });
+
+    it('placerar aldrig innehåll utanför marginalerna', () => {
+      for (const columns of ['auto', 1, 2, 4, 6] as const) {
+        for (const fontSizePt of [10, 14, 24]) {
+          const layout = computeGridLayout({
+            problemCount: 41,
+            fontSizePt,
+            columns,
+            layout: 'clock',
+          });
+          for (const p of layout.positions) {
+            expect(p.xMm).toBeGreaterThanOrEqual(A4_METRICS.marginMm);
+            expect(p.xMm + layout.columnWidthMm).toBeLessThanOrEqual(
+              A4_METRICS.pageWidthMm - A4_METRICS.marginMm + 1e-9,
+            );
+            expect(p.yMm).toBeGreaterThanOrEqual(A4_METRICS.marginMm + A4_METRICS.headerHeightMm);
+            expect(p.yMm).toBeLessThanOrEqual(
+              A4_METRICS.pageHeightMm - A4_METRICS.marginMm - A4_METRICS.footerHeightMm + 1e-9,
+            );
+          }
+        }
+      }
+    });
+
+    it('urtavlan ryms aldrig bredare än sin egen kolumn, även med ett smalt manuellt kolumnantal', () => {
+      for (const columns of [1, 2, 3, 4, 5, 6]) {
+        const layout = computeGridLayout({
+          problemCount: 6,
+          fontSizePt: 14,
+          columns,
+          layout: 'clock',
+        });
+        expect(layout.clockDiameterMm!).toBeLessThanOrEqual(layout.columnWidthMm);
+      }
+    });
+
+    it('ger en större urtavla vid större teckenstorlek, upp till maxtaket', () => {
+      const small = computeGridLayout({
+        problemCount: 1,
+        fontSizePt: 10,
+        columns: 2,
+        layout: 'clock',
+      });
+      const large = computeGridLayout({
+        problemCount: 1,
+        fontSizePt: 20,
+        columns: 2,
+        layout: 'clock',
+      });
+      expect(large.clockDiameterMm!).toBeGreaterThan(small.clockDiameterMm!);
+    });
+
+    it('fördelar uppgifter över rätt antal sidor', () => {
+      const layout = computeGridLayout({
+        problemCount: 30,
+        fontSizePt: 14,
+        columns: 3,
+        layout: 'clock',
+      });
+      const expectedPageCount = Math.ceil(30 / layout.problemsPerPage);
+      expect(layout.pageCount).toBe(expectedPageCount);
+    });
+  });
 });

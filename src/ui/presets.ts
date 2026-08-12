@@ -56,6 +56,40 @@ export const PRESETS: Preset[] = [
       return state;
     },
   },
+  {
+    id: 'clock-hour-half',
+    label: 'Klockan hel & halv',
+    build: () => {
+      const state = createDefaultState();
+      state.sheetType = 'clock';
+      state.clock.step = 'half';
+      state.document.header.title = 'Klockan — hel och halv';
+      return state;
+    },
+  },
+  {
+    id: 'clock-quarter',
+    label: 'Klockan kvart',
+    build: () => {
+      const state = createDefaultState();
+      state.sheetType = 'clock';
+      state.clock.step = 'quarter';
+      state.document.header.title = 'Klockan — kvart';
+      return state;
+    },
+  },
+  {
+    id: 'clock-five',
+    label: 'Klockan fem i halv',
+    build: () => {
+      const state = createDefaultState();
+      state.sheetType = 'clock';
+      state.clock.step = 'five';
+      state.clock.twentyFortyPhrasing = 'halv';
+      state.document.header.title = 'Klockan — alla minuter';
+      return state;
+    },
+  },
 ];
 
 /** Nivå-chips: sätter samma talområde på alla fyra räknesätt, oavsett om de är aktiverade. */

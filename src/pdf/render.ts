@@ -1,8 +1,11 @@
 import { jsPDF } from 'jspdf';
-import type { DocumentConfig, Problem } from '../types';
+import { clockPhrase } from '../core/clock';
+import type { ClockGeneratorConfig, ClockProblem, DocumentConfig, Problem } from '../types';
 import { computeOperandDigitCounts, formatAnswer, OPERATION_SYMBOLS } from './format';
+import { drawClockFace } from './clockFace';
 import {
   A4_METRICS,
+  CLOCK_FACE_LABEL_GAP_MM,
   computeGridLayout,
   MM_PER_PT,
   VERTICAL_BOX_GAP_FACTOR,
@@ -357,5 +360,242 @@ function drawVerticalProblem(
       rightEdgeX - position.xMm,
       fontSizeMm * VERTICAL_BOX_HEIGHT_FACTOR,
     );
+  }
+}
+
+/** Den del av ClockGeneratorConfig som faktiskt behövs för att RITA ett
+ * klockblad — count/avoidDuplicates/seed styr bara genereringen, se core/clock.ts. */
+export type ClockDocumentOptions = Pick<
+  ClockGeneratorConfig,
+  'twentyFortyPhrasing' | 'showNumerals' | 'showMinuteTicks'
+>;
+
+/**
+ * Klockblad delar sidhuvud/sidfot och sidbrytningslogik med
+ * renderProblemsToPdf, men har ett eget uppgiftsformat (urtavla + text i
+ * stället för en rad med siffror) — se drawClockProblem. Arrayerna hålls
+ * medvetet isär (Problem[] kontra ClockProblem[]) i stället för att slås ihop
+ * till en gemensam union, så att hela den befintliga uppgiftsrenderingen
+ * ovan förblir orörd.
+ */
+export function renderClockSheetToPdf(
+  problems: ClockProblem[],
+  config: DocumentConfig,
+  clockOptions: ClockDocumentOptions,
+): jsPDF {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const layout = computeGridLayout({
+    problemCount: problems.length,
+    fontSizePt: config.fontSizePt,
+    columns: config.columns,
+    layout: 'clock',
+  });
+
+  if (layout.pageCount === 0) {
+    drawHeader(doc, config, null);
+    drawFooter(doc, 0, 1, config.seed);
+    return doc;
+  }
+
+  renderClockSection(doc, problems, layout, config, clockOptions, {
+    showAnswers: false,
+    sectionLabel: null,
+  });
+
+  if (config.includeAnswerKey) {
+    doc.addPage();
+    renderClockSection(doc, problems, layout, config, clockOptions, {
+      showAnswers: true,
+      sectionLabel: 'Facit',
+    });
+  }
+
+  return doc;
+}
+
+function renderClockSection(
+  doc: jsPDF,
+  problems: ClockProblem[],
+  layout: GridLayout,
+  config: DocumentConfig,
+  clockOptions: ClockDocumentOptions,
+  options: SectionOptions,
+): void {
+  for (let page = 0; page < layout.pageCount; page++) {
+    if (page > 0) {
+      doc.addPage();
+    }
+    drawHeader(doc, config, options.sectionLabel);
+    for (const position of layout.positions) {
+      if (position.page === page) {
+        drawClockProblem(
+          doc,
+          problems[position.index],
+          position,
+          layout,
+          config,
+          clockOptions,
+          options.showAnswers,
+        );
+      }
+    }
+    drawFooter(doc, page, layout.pageCount, config.seed);
+  }
+}
+
+/**
+ * position.yMm är (liksom i de andra layouterna) baslinjen för radens sista
+ * textrad — här: textraden under urtavlan. Urtavlans centrum räknas uppåt
+ * därifrån med exakt samma tal (clockDiameterMm, CLOCK_FACE_LABEL_GAP_MM) som
+ * layout.ts reserverade radhöjd utifrån, se computeGridLayout.
+ */
+/** Textstorleken krymper aldrig under det här, oavsett hur trång kolumnen är. */
+const MIN_CLOCK_LABEL_FONT_PT = 7;
+/** Liten säkerhetsmarginal i sidled mot nästa kolumn. */
+const CLOCK_LABEL_MAX_WIDTH_MARGIN_MM = 2;
+
+function drawClockProblem(
+  doc: jsPDF,
+  problem: ClockProblem,
+  position: CellPosition,
+  layout: GridLayout,
+  config: DocumentConfig,
+  clockOptions: ClockDocumentOptions,
+  showAnswers: boolean,
+): void {
+  const diameter = layout.clockDiameterMm!;
+  const radius = diameter / 2;
+  const faceCenterX = position.xMm + layout.columnWidthMm / 2;
+  const faceCenterY = position.yMm - CLOCK_FACE_LABEL_GAP_MM - radius;
+  const maxLabelWidthMm = layout.columnWidthMm - CLOCK_LABEL_MAX_WIDTH_MARGIN_MM;
+
+  // Facit visar alltid visarna på urtavlan, oavsett riktning — annars går
+  // "Rita visarna"-uppgifterna inte att kontrollera mot ett facit. I den
+  // vanliga (icke-facit) sidan saknas visarna bara för 'draw', där det är
+  // själva poängen att eleven ritar dem för hand.
+  const showHands = showAnswers || problem.direction === 'read';
+  drawClockFace(doc, faceCenterX, faceCenterY, radius, {
+    hour: showHands ? problem.hour : undefined,
+    minute: showHands ? problem.minute : undefined,
+    showNumerals: clockOptions.showNumerals,
+    showMinuteTicks: clockOptions.showMinuteTicks,
+  });
+
+  const phrase = clockPhrase(problem.hour, problem.minute, clockOptions.twentyFortyPhrasing);
+
+  if (problem.direction === 'draw') {
+    // Frasen ÄR uppgiften här (urtavlan saknar visare) — samma text i både
+    // uppgift och facit, bara urtavlans visare skiljer dem åt.
+    drawFittedCenteredClockLabel(
+      doc,
+      phrase,
+      faceCenterX,
+      position.yMm,
+      maxLabelWidthMm,
+      config.fontSizePt,
+    );
+    return;
+  }
+
+  if (showAnswers) {
+    drawFittedCenteredClockLabel(
+      doc,
+      `Klockan är ${phrase}.`,
+      faceCenterX,
+      position.yMm,
+      maxLabelWidthMm,
+      config.fontSizePt,
+    );
+    return;
+  }
+
+  drawClockReadPrompt(
+    doc,
+    faceCenterX,
+    position.yMm,
+    config.answerStyle,
+    maxLabelWidthMm,
+    config.fontSizePt,
+  );
+}
+
+/**
+ * Skriver en centrerad textrad och krymper teckenstorleken (aldrig under
+ * MIN_CLOCK_LABEL_FONT_PT) om den annars skulle bli bredare än kolumnen.
+ * Klockfraserna varierar mycket i längd ("tre" mot "tio över halv sju"), till
+ * skillnad från räknesättens siffror/operatorer där hela kolumnbredden mäts
+ * upp i förväg (se computeProblemMetrics) — en fast teckenstorlek hade annars
+ * kunnat få en lång fras att krocka med nästa kolumns urtavla.
+ */
+function drawFittedCenteredClockLabel(
+  doc: jsPDF,
+  text: string,
+  centerX: number,
+  baselineY: number,
+  maxWidthMm: number,
+  basePt: number,
+): void {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(basePt);
+  const width = doc.getTextWidth(text);
+  if (width > maxWidthMm) {
+    doc.setFontSize(Math.max(basePt * (maxWidthMm / width), MIN_CLOCK_LABEL_FONT_PT));
+  }
+  doc.text(text, centerX, baselineY, { align: 'center' });
+}
+
+/**
+ * "Klockan är ____" (eller en linje/ruta i stället för understrecket,
+ * beroende på config.answerStyle) — centrerad som en helhet under urtavlan.
+ * jsPDF:s `align: 'center'` centrerar bara en enskild text()-anrop, så hela
+ * bredden (prompt + tomrum) räknas ut först och promptens vänsterkant
+ * placeras därefter för hand, samma teknik som drawOperandBlank använder för
+ * att hålla en tom plats inom en exakt reserverad bredd. Krymps precis som
+ * drawFittedCenteredClockLabel om den ändå blir för bred för kolumnen.
+ */
+function drawClockReadPrompt(
+  doc: jsPDF,
+  centerX: number,
+  baselineY: number,
+  answerStyle: DocumentConfig['answerStyle'],
+  maxWidthMm: number,
+  basePt: number,
+): void {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(basePt);
+  const prompt = 'Klockan är ';
+
+  const measure = (): { promptWidth: number; blankWidth: number } => ({
+    promptWidth: doc.getTextWidth(prompt),
+    blankWidth:
+      answerStyle === 'blank'
+        ? doc.getTextWidth(BLANK_PLACEHOLDER)
+        : answerStyle === 'line'
+          ? LINE_LENGTH_MM
+          : BOX_SIZE_MM,
+  });
+
+  let { promptWidth, blankWidth } = measure();
+  if (promptWidth + blankWidth > maxWidthMm) {
+    doc.setFontSize(
+      Math.max(basePt * (maxWidthMm / (promptWidth + blankWidth)), MIN_CLOCK_LABEL_FONT_PT),
+    );
+    ({ promptWidth, blankWidth } = measure());
+  }
+
+  const startX = centerX - (promptWidth + blankWidth) / 2;
+  doc.text(prompt, startX, baselineY);
+  const blankStartX = startX + promptWidth;
+
+  switch (answerStyle) {
+    case 'blank':
+      doc.text(BLANK_PLACEHOLDER, blankStartX, baselineY);
+      break;
+    case 'line':
+      doc.line(blankStartX, baselineY + 1, blankStartX + LINE_LENGTH_MM, baselineY + 1);
+      break;
+    case 'box':
+      doc.rect(blankStartX, baselineY - BOX_SIZE_MM + 2, BOX_SIZE_MM, BOX_SIZE_MM);
+      break;
   }
 }

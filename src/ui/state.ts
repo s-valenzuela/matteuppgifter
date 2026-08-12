@@ -1,17 +1,33 @@
-import type { DocumentConfig, GeneratorConfig, OperationConfig } from '../types';
+import type {
+  ClockGeneratorConfig,
+  DocumentConfig,
+  GeneratorConfig,
+  OperationConfig,
+  SheetType,
+} from '../types';
 
 /**
  * Formulärets tillstånd. `document` saknar `seed` — det speglas alltid från
- * `generator.seed` via {@link toDocumentConfig} i stället för att lagras (och
- * riskera att bli osynkat) på två ställen.
+ * den AKTIVA sidans seed (generator.seed eller clock.seed, beroende på
+ * sheetType) via {@link toDocumentConfig} i stället för att lagras (och
+ * riskera att bli osynkat) på fler ställen.
+ *
+ * `generator` och `clock` hålls medvetet som två helt separata, oberoende
+ * konfigurationer (i stället för att t.ex. dela count/avoidDuplicates/seed i
+ * ett gemensamt objekt) — formuläret (ui/form.ts) visar dem som samma fält
+ * för användaren, men det låter hela räknesättsvägen (generate.ts,
+ * validate.ts, GeneratorConfig) förbli helt orörd av klockfunktionen.
  */
 export interface AppState {
+  sheetType: SheetType;
   generator: GeneratorConfig;
+  clock: ClockGeneratorConfig;
   document: Omit<DocumentConfig, 'seed'>;
 }
 
 export function toDocumentConfig(state: AppState): DocumentConfig {
-  return { ...state.document, seed: state.generator.seed };
+  const seed = state.sheetType === 'clock' ? state.clock.seed : state.generator.seed;
+  return { ...state.document, seed };
 }
 
 function op(overrides: Partial<OperationConfig> = {}): OperationConfig {
@@ -24,6 +40,7 @@ function op(overrides: Partial<OperationConfig> = {}): OperationConfig {
 
 export function createDefaultState(): AppState {
   return {
+    sheetType: 'arithmetic',
     generator: {
       operations: {
         add: op({ enabled: true, operandRange: { min: 0, max: 20 } }),
@@ -37,6 +54,7 @@ export function createDefaultState(): AppState {
       missingNumber: false,
       seed: randomSeed(),
     },
+    clock: createDefaultClockConfig(),
     document: {
       header: { title: 'Matteuppgifter', showName: true, showDate: true },
       fontSizePt: 14,
@@ -45,6 +63,19 @@ export function createDefaultState(): AppState {
       answerStyle: 'blank',
       includeAnswerKey: true,
     },
+  };
+}
+
+function createDefaultClockConfig(): ClockGeneratorConfig {
+  return {
+    step: 'quarter',
+    twentyFortyPhrasing: 'halv',
+    direction: 'read',
+    showNumerals: true,
+    showMinuteTicks: false,
+    count: 12,
+    avoidDuplicates: true,
+    seed: randomSeed(),
   };
 }
 

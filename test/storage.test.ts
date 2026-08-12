@@ -40,4 +40,22 @@ describe('saveState / loadState', () => {
     expect(() => saveState(createDefaultState())).not.toThrow();
     spy.mockRestore();
   });
+
+  it('fyller på sheetType och clock för ett tillstånd sparat innan klockfunktionen fanns', () => {
+    // isAppState() är en medvetet ytlig kontroll som inte känner av
+    // sheetType/clock — ett äldre sparat tillstånd (utan de fälten) ska ändå
+    // laddas, med sheetType/clock påfyllda till sina standardvärden, i
+    // stället för att komma tillbaka med dem som undefined.
+    const legacyState = createDefaultState();
+    // @ts-expect-error simulerar JSON sparat innan sheetType/clock fanns
+    delete legacyState.sheetType;
+    // @ts-expect-error se ovan
+    delete legacyState.clock;
+    localStorage.setItem('matteuppgifter:state:v1', JSON.stringify(legacyState));
+
+    const loaded = loadState();
+    expect(loaded?.sheetType).toBe('arithmetic');
+    expect(loaded?.clock).toBeDefined();
+    expect(loaded?.clock.step).toBe(createDefaultState().clock.step);
+  });
 });

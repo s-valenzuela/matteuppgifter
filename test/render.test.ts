@@ -1,9 +1,28 @@
 import { describe, expect, it } from 'vitest';
+import { generateClockProblems } from '../src/core/clock';
 import { generateProblems } from '../src/core/generate';
 import { computeGridLayout } from '../src/pdf/layout';
-import { renderProblemsToPdf } from '../src/pdf/render';
-import type { DocumentConfig } from '../src/types';
+import {
+  renderClockSheetToPdf,
+  renderProblemsToPdf,
+  type ClockDocumentOptions,
+} from '../src/pdf/render';
+import type { ClockGeneratorConfig, DocumentConfig } from '../src/types';
 import { baseConfig, opConfig } from './helpers';
+
+function baseClockConfig(overrides: Partial<ClockGeneratorConfig> = {}): ClockGeneratorConfig {
+  return {
+    step: 'five',
+    twentyFortyPhrasing: 'halv',
+    direction: 'read',
+    showNumerals: true,
+    showMinuteTicks: false,
+    count: 12,
+    avoidDuplicates: true,
+    seed: 1,
+    ...overrides,
+  };
+}
 
 function baseDocumentConfig(overrides: Partial<DocumentConfig> = {}): DocumentConfig {
   return {
@@ -211,6 +230,94 @@ describe('renderProblemsToPdf', () => {
         );
         expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
         expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+});
+
+describe('renderClockSheetToPdf', () => {
+  function clockOptions(overrides: Partial<ClockDocumentOptions> = {}): ClockDocumentOptions {
+    return {
+      twentyFortyPhrasing: 'halv',
+      showNumerals: true,
+      showMinuteTicks: false,
+      ...overrides,
+    };
+  }
+
+  it('genererar en icke-tom PDF för ett litet klockblad', () => {
+    const problems = generateClockProblems(baseClockConfig());
+    const doc = renderClockSheetToPdf(problems, baseDocumentConfig(), clockOptions());
+    expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+    expect(doc.getNumberOfPages()).toBe(1);
+  });
+
+  it('lämnar en enda tom sida med bara rubriken när inga uppgifter finns', () => {
+    const doc = renderClockSheetToPdf([], baseDocumentConfig(), clockOptions());
+    expect(doc.getNumberOfPages()).toBe(1);
+  });
+
+  it('matchar sidantalet från layout-beräkningen för klockläget', () => {
+    const problems = generateClockProblems(baseClockConfig({ count: 60, avoidDuplicates: false }));
+    const config = baseDocumentConfig({ columns: 3, fontSizePt: 14 });
+    const layout = computeGridLayout({
+      problemCount: problems.length,
+      fontSizePt: config.fontSizePt,
+      columns: config.columns,
+      layout: 'clock',
+    });
+
+    const doc = renderClockSheetToPdf(problems, config, clockOptions());
+    expect(doc.getNumberOfPages()).toBe(layout.pageCount);
+  });
+
+  it('lägger till facit-sidor sist när includeAnswerKey är satt', () => {
+    const problems = generateClockProblems(baseClockConfig({ count: 60, avoidDuplicates: false }));
+    const config = baseDocumentConfig({ columns: 3, fontSizePt: 14 });
+    const layout = computeGridLayout({
+      problemCount: problems.length,
+      fontSizePt: config.fontSizePt,
+      columns: config.columns,
+      layout: 'clock',
+    });
+
+    const withoutKey = renderClockSheetToPdf(problems, config, clockOptions());
+    const withKey = renderClockSheetToPdf(
+      problems,
+      { ...config, includeAnswerKey: true },
+      clockOptions(),
+    );
+
+    expect(withoutKey.getNumberOfPages()).toBe(layout.pageCount);
+    expect(withKey.getNumberOfPages()).toBe(layout.pageCount * 2);
+  });
+
+  it('fungerar för alla riktningar, svarsstilar och steg, med facit, utan att kasta fel', () => {
+    for (const direction of ['read', 'draw', 'mixed'] as const) {
+      for (const answerStyle of ['blank', 'line', 'box'] as const) {
+        for (const step of ['hour', 'half', 'quarter', 'five'] as const) {
+          const problems = generateClockProblems(baseClockConfig({ direction, step, count: 20 }));
+          const doc = renderClockSheetToPdf(
+            problems,
+            baseDocumentConfig({ answerStyle, includeAnswerKey: true }),
+            clockOptions(),
+          );
+          expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('fungerar med siffror/minutstreck av och på, utan att kasta fel', () => {
+    const problems = generateClockProblems(baseClockConfig());
+    for (const showNumerals of [true, false]) {
+      for (const showMinuteTicks of [true, false]) {
+        const doc = renderClockSheetToPdf(
+          problems,
+          baseDocumentConfig(),
+          clockOptions({ showNumerals, showMinuteTicks }),
+        );
+        expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
       }
     }
   });

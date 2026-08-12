@@ -76,7 +76,29 @@ export const VERTICAL_BOX_HEIGHT_FACTOR = 1.4;
 const VERTICAL_ROW_EXTRA_GAP_FACTOR =
   VERTICAL_RULE_GAP_FACTOR + VERTICAL_BOX_GAP_FACTOR + VERTICAL_BOX_HEIGHT_FACTOR + 0.5;
 
-export type DocumentLayoutMode = 'grid' | 'vertical';
+/**
+ * Urtavlans målstorlek som multipel av teckenstorleken, innan den klämmer mot
+ * kolumnbredden (se resolveColumns/computeGridLayout). Skalar med
+ * textstorleken så att "större text" också ger större, lättlästa urtavlor.
+ */
+const CLOCK_DIAMETER_FONT_FACTOR = 3.4;
+const CLOCK_DIAMETER_MIN_MM = 18;
+const CLOCK_DIAMETER_MAX_MM = 45;
+/** Luft runt urtavlan i kolumnbredden, respektive mellan kolumner. */
+const CLOCK_COLUMN_GUTTER_MM = 6;
+/**
+ * Avstånd mellan urtavlans nederkant och textradens baslinje, i mm — fast
+ * mått oavsett teckenstorlek, samma princip som t.ex. GAP_AFTER_PROMPT_MM i
+ * render.ts. Exporterad så att render.ts kan placera urtavlans centrum
+ * utifrån exakt samma tal som här reserverats i radhöjden.
+ */
+export const CLOCK_FACE_LABEL_GAP_MM = 5;
+/** Extra luft under textraden, för nedstick (g, j, å) innan nästa rads urtavla. */
+const CLOCK_LABEL_DESCENDER_MM = 2;
+/** Extra luft mellan en klockrads block och nästa rads block. */
+const CLOCK_ROW_EXTRA_GAP_MM = 4;
+
+export type DocumentLayoutMode = 'grid' | 'vertical' | 'clock';
 
 export interface GridLayoutInput {
   problemCount: number;
@@ -106,6 +128,8 @@ export interface GridLayout {
   problemsPerPage: number;
   pageCount: number;
   positions: CellPosition[];
+  /** Bara satt när layout är 'clock' — urtavlans diameter, se drawClockProblem i render.ts. */
+  clockDiameterMm?: number;
 }
 
 export function computeGridLayout(input: GridLayoutInput): GridLayout {
@@ -116,17 +140,48 @@ export function computeGridLayout(input: GridLayoutInput): GridLayout {
   const availableHeightMm =
     metrics.pageHeightMm - 2 * metrics.marginMm - metrics.headerHeightMm - metrics.footerHeightMm;
 
+  const targetClockDiameterMm = clamp(
+    fontSizeMm * CLOCK_DIAMETER_FONT_FACTOR,
+    CLOCK_DIAMETER_MIN_MM,
+    CLOCK_DIAMETER_MAX_MM,
+  );
+
+  const columns = resolveColumns(
+    input.columns,
+    layoutMode,
+    fontSizeMm,
+    availableWidthMm,
+    targetClockDiameterMm,
+  );
+  const columnWidthMm = availableWidthMm / columns;
+
+  // Ett manuellt valt kolumnantal kan ge en kolumn som är smalare eller
+  // bredare än målstorleken — urtavlan klämmer till kolumnens faktiska
+  // bredd i stället för att sticka ut i nästa kolumn eller bli onödigt liten.
+  const clockDiameterMm =
+    layoutMode === 'clock'
+      ? clamp(
+          Math.min(targetClockDiameterMm, columnWidthMm - CLOCK_COLUMN_GUTTER_MM),
+          10,
+          CLOCK_DIAMETER_MAX_MM,
+        )
+      : undefined;
+
   const rowHeightMm =
     layoutMode === 'vertical'
       ? Math.max(
           fontSizeMm * (2 * VERTICAL_LINE_STEP_FACTOR + VERTICAL_ROW_EXTRA_GAP_FACTOR),
           MIN_ROW_HEIGHT_MM * 2.5,
         )
-      : Math.max(fontSizeMm * LINE_HEIGHT_FACTOR, MIN_ROW_HEIGHT_MM);
+      : layoutMode === 'clock'
+        ? clockDiameterMm! +
+          CLOCK_FACE_LABEL_GAP_MM +
+          fontSizeMm +
+          CLOCK_LABEL_DESCENDER_MM +
+          CLOCK_ROW_EXTRA_GAP_MM
+        : Math.max(fontSizeMm * LINE_HEIGHT_FACTOR, MIN_ROW_HEIGHT_MM);
   const rowsPerPage = Math.max(1, Math.floor(availableHeightMm / rowHeightMm));
 
-  const columns = resolveColumns(input.columns, layoutMode, fontSizeMm, availableWidthMm);
-  const columnWidthMm = availableWidthMm / columns;
   const problemsPerPage = columns * rowsPerPage;
   const pageCount = input.problemCount > 0 ? Math.ceil(input.problemCount / problemsPerPage) : 0;
 
@@ -153,6 +208,7 @@ export function computeGridLayout(input: GridLayoutInput): GridLayout {
     problemsPerPage,
     pageCount,
     positions,
+    clockDiameterMm,
   };
 }
 
@@ -161,8 +217,13 @@ function resolveColumns(
   layoutMode: DocumentLayoutMode,
   fontSizeMm: number,
   availableWidthMm: number,
+  targetClockDiameterMm: number,
 ): number {
   if (columns === 'auto') {
+    if (layoutMode === 'clock') {
+      const estimatedCellWidthMm = targetClockDiameterMm + CLOCK_COLUMN_GUTTER_MM;
+      return Math.max(1, Math.floor(availableWidthMm / estimatedCellWidthMm));
+    }
     const estimatedChars =
       layoutMode === 'vertical'
         ? ESTIMATED_CHARS_PER_PROBLEM_VERTICAL
@@ -172,4 +233,8 @@ function resolveColumns(
     return Math.max(1, Math.floor(availableWidthMm / estimatedCellWidthMm));
   }
   return Math.max(1, Math.floor(columns));
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }

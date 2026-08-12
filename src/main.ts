@@ -1,7 +1,9 @@
 import './style.css';
+import type { jsPDF } from 'jspdf';
+import { generateClockProblems } from './core/clock';
 import { generateProblems } from './core/generate';
-import { validateConfig } from './core/validate';
-import { renderProblemsToPdf } from './pdf/render';
+import { validateClockConfig, validateConfig } from './core/validate';
+import { renderClockSheetToPdf, renderProblemsToPdf } from './pdf/render';
 import { decodeState, encodeState } from './state/urlState';
 import { loadState, saveState } from './state/storage';
 import { mountForm } from './ui/form';
@@ -59,10 +61,18 @@ function escapeHtml(text: string): string {
 }
 
 function regenerate(state: AppState): void {
+  if (state.sheetType === 'clock') {
+    const { config, warnings } = validateClockConfig(state.clock);
+    renderWarnings(warnings);
+    preview.update(() =>
+      renderClockSheetToPdf(generateClockProblems(config), toDocumentConfig(state), config),
+    );
+    return;
+  }
+
   const { config, warnings } = validateConfig(state.generator);
   renderWarnings(warnings);
-  const problems = generateProblems(config);
-  preview.update(problems, toDocumentConfig(state));
+  preview.update(() => renderProblemsToPdf(generateProblems(config), toDocumentConfig(state)));
 }
 
 let copyLinkStatusTimeoutId: number | undefined;
@@ -78,11 +88,14 @@ function persistState(state: AppState): void {
   window.history.replaceState(null, '', url);
 }
 
-function buildCurrentPdf() {
+function buildCurrentPdf(): jsPDF {
   const state = form.getState();
+  if (state.sheetType === 'clock') {
+    const { config } = validateClockConfig(state.clock);
+    return renderClockSheetToPdf(generateClockProblems(config), toDocumentConfig(state), config);
+  }
   const { config } = validateConfig(state.generator);
-  const problems = generateProblems(config);
-  return renderProblemsToPdf(problems, toDocumentConfig(state));
+  return renderProblemsToPdf(generateProblems(config), toDocumentConfig(state));
 }
 
 function sanitizeFilename(title: string): string {
