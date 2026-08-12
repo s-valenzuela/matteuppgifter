@@ -19,6 +19,7 @@ export function baseConfig(overrides: Partial<GeneratorConfig> = {}): GeneratorC
     count: 20,
     avoidDuplicates: false,
     shuffle: false,
+    missingNumber: false,
     seed: 1,
     ...overrides,
   };

@@ -3,16 +3,58 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Matteuppgifter — PDF-generator</title>
+    <title>Matteuppgifter — gratis övningsblad att skriva ut</title>
     <meta
       name="description"
-      content="Skapa övningsblad med addition, subtraktion, multiplikation och division — allt körs i webbläsaren, inget lämnar din dator."
+      content="Skapa gratis övningsblad i addition, subtraktion, multiplikation och division. Skriv ut som PDF direkt i webbläsaren — inget konto, inga uppgifter lämnar din dator."
     />
+    <link rel="canonical" href="https://matteuppgifter.se/" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#17181a" media="(prefers-color-scheme: dark)" />
+
+    <!-- Open Graph / social-förhandsvisningar (Facebook, Slack, LinkedIn, ...) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Matteuppgifter" />
+    <meta property="og:locale" content="sv_SE" />
+    <meta property="og:url" content="https://matteuppgifter.se/" />
+    <meta property="og:title" content="Matteuppgifter — gratis övningsblad att skriva ut" />
+    <meta
+      property="og:description"
+      content="Skapa gratis övningsblad i addition, subtraktion, multiplikation och division. Skriv ut som PDF direkt i webbläsaren — inget konto, inga uppgifter lämnar din dator."
+    />
+    <meta property="og:image" content="https://matteuppgifter.se/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Matteuppgifter — gratis övningsblad att skriva ut" />
+    <meta
+      name="twitter:description"
+      content="Skapa gratis övningsblad i addition, subtraktion, multiplikation och division. Skriv ut som PDF direkt i webbläsaren."
+    />
+    <meta name="twitter:image" content="https://matteuppgifter.se/og-image.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "EducationalApplication",
+        "name": "Matteuppgifter",
+        "url": "https://matteuppgifter.se/",
+        "description": "Skapa gratis övningsblad i addition, subtraktion, multiplikation och division. Skriv ut som PDF direkt i webbläsaren — inget konto, inga uppgifter lämnar din dator.",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Alla (körs i webbläsaren)",
+        "inLanguage": "sv",
+        "isAccessibleForFree": true,
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "SEK"
+        }
+      }
+    </script>
   </head>
   <body>
     <main>
@@ -65,6 +107,27 @@
           </div>
         </div>
       </div>
+
+      <section aria-labelledby="about-heading" class="about">
+        <h2 id="about-heading">Om Matteuppgifter</h2>
+        <p>
+          Matteuppgifter är ett gratis verktyg för föräldrar och lärare som vill skapa övningsblad i
+          de fyra räknesätten — addition, subtraktion, multiplikation och division — och skriva ut
+          dem direkt. Det passar bra för läxor, extra övning hemma, eller som färdigt underlag i
+          klassrummet, från de första additionsuppgifterna i förskoleklass till
+          multiplikationstabeller och division med rest i mellanstadiet.
+        </p>
+        <p>
+          Ställ in talområde per räknesätt (eller använd en färdig nivå: 0–10, 0–20, 10–20, 0–100),
+          välj mellan vågrät uppställning ("12 + 7 = ___") eller talen staplade med ett streck, och
+          lägg till ett facit på egna sidor. Varje blad går att återskapa exakt via en delbar länk
+          eller en seed, så samma övningsblad kan skrivas ut igen senare.
+        </p>
+        <p>
+          Allt körs i webbläsaren — inga konton, ingen inloggning och inga uppgifter skickas till
+          någon server. Sidan går även att installera och användas offline efter första besöket.
+        </p>
+      </section>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

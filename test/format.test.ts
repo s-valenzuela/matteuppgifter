@@ -16,7 +16,7 @@ describe('OPERATION_SYMBOLS', () => {
 });
 
 function problem(overrides: Partial<Problem>): Problem {
-  return { op: 'add', a: 0, b: 0, answer: 0, ...overrides };
+  return { op: 'add', a: 0, b: 0, answer: 0, missingSlot: 'answer', ...overrides };
 }
 
 describe('computeOperandDigitCounts', () => {
@@ -43,17 +43,31 @@ describe('computeOperandDigitCounts', () => {
 
 describe('formatAnswer', () => {
   it('formaterar ett vanligt svar', () => {
-    const problem: Problem = { op: 'add', a: 12, b: 7, answer: 19 };
+    const problem: Problem = { op: 'add', a: 12, b: 7, answer: 19, missingSlot: 'answer' };
     expect(formatAnswer(problem)).toBe('19');
   });
 
   it('formaterar division med rest som "kvot r rest"', () => {
-    const problem: Problem = { op: 'div', a: 17, b: 5, answer: 3, remainder: 2 };
+    const problem: Problem = {
+      op: 'div',
+      a: 17,
+      b: 5,
+      answer: 3,
+      remainder: 2,
+      missingSlot: 'answer',
+    };
     expect(formatAnswer(problem)).toBe('3 r 2');
   });
 
   it('visar "r 0" när resten råkar bli noll, i stället för att tysta försvinna', () => {
-    const problem: Problem = { op: 'div', a: 15, b: 5, answer: 3, remainder: 0 };
+    const problem: Problem = {
+      op: 'div',
+      a: 15,
+      b: 5,
+      answer: 3,
+      remainder: 0,
+      missingSlot: 'answer',
+    };
     expect(formatAnswer(problem)).toBe('3 r 0');
   });
 });

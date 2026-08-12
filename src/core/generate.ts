@@ -1,4 +1,11 @@
-import type { GeneratorConfig, Operation, OperationConfig, Problem, Range } from '../types';
+import type {
+  GeneratorConfig,
+  MissingSlot,
+  Operation,
+  OperationConfig,
+  Problem,
+  Range,
+} from '../types';
 import { mulberry32, pick, randomInt, type Rng } from './rng';
 
 /** Tak på omdragningsförsök innan generatorn ger upp och accepterar kandidaten den har. */
@@ -22,7 +29,10 @@ export function generateProblems(config: GeneratorConfig): Problem[] {
     if (config.avoidDuplicates && !seen[op]) {
       seen[op] = new Set();
     }
-    return generateOne(op, opConfig, rng, seen[op]);
+    const problem = generateOne(op, opConfig, rng, seen[op]);
+    return config.missingNumber
+      ? { ...problem, missingSlot: chooseMissingSlot(op, problem, rng) }
+      : problem;
   });
 
   if (config.shuffle) {
@@ -30,6 +40,34 @@ export function generateProblems(config: GeneratorConfig): Problem[] {
   }
 
   return problems;
+}
+
+/**
+ * Väljer vilken del av uppgiften som ska vara tom i "Saknat tal"-läget
+ * (t.ex. "3 + __ = 10" i stället för "3 + 7 = __"). Begränsad per
+ * räknesätt så att svaret alltid går att räkna ut entydigt:
+ * - division blankar aldrig nämnaren (b) — går kvoten jämnt upp till 0
+ *   (eller finns en rest inblandad) blir "a ÷ __ = kvot" inte entydigt
+ *   lösbart, till skillnad från att blanka täljaren (alltid a = b*kvot+rest).
+ * - multiplikation blankar aldrig en faktor vars motpart är 0 — annars blir
+ *   "__ × 0 = 0" olösligt (vilket tal som helst stämmer).
+ */
+function chooseMissingSlot(op: Operation, problem: Problem, rng: Rng): MissingSlot {
+  if (op === 'div') {
+    return pick(rng, ['a', 'answer']);
+  }
+  const candidates: MissingSlot[] = ['a', 'b', 'answer'];
+  if (op === 'mul') {
+    return pick(
+      rng,
+      candidates.filter((slot) => {
+        if (slot === 'a') return problem.b !== 0;
+        if (slot === 'b') return problem.a !== 0;
+        return true;
+      }),
+    );
+  }
+  return pick(rng, candidates);
 }
 
 /** Fördelar `count` uppgifter så jämnt som möjligt över de valda räknesätten. */
@@ -70,7 +108,31 @@ function problemKey(problem: Problem): string {
   return `${problem.a}:${problem.b}`;
 }
 
+/**
+ * Drar en kandidat för räknesättet, och drar om (upp till MAX_ATTEMPTS
+ * gånger) tills svaret hamnar inom resultRange om en sådan är satt. Gemensam
+ * för alla fyra räknesätt i stället för att varje generateX-funktion har sin
+ * egen omdragningsloop — resultRange betyder samma sak ("gräns på svaret")
+ * oavsett räknesätt.
+ */
 function generateCandidate(op: Operation, config: OperationConfig, rng: Rng): Problem {
+  const resultRange = config.resultRange;
+  if (!resultRange) {
+    return generateRaw(op, config, rng);
+  }
+
+  let candidate = generateRaw(op, config, rng);
+  for (
+    let attempt = 0;
+    attempt < MAX_ATTEMPTS && !withinRange(candidate.answer, resultRange);
+    attempt++
+  ) {
+    candidate = generateRaw(op, config, rng);
+  }
+  return candidate;
+}
+
+function generateRaw(op: Operation, config: OperationConfig, rng: Rng): Problem {
   switch (op) {
     case 'add':
       return generateAddition(config, rng);
@@ -85,20 +147,9 @@ function generateCandidate(op: Operation, config: OperationConfig, rng: Rng): Pr
 
 function generateAddition(config: OperationConfig, rng: Rng): Problem {
   const { min, max } = config.operandRange;
-  const resultRange = config.resultRange;
-
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const a = randomInt(rng, min, max);
-    const b = randomInt(rng, min, max);
-    const answer = a + b;
-    if (!resultRange || withinRange(answer, resultRange)) {
-      return { op: 'add', a, b, answer };
-    }
-  }
-
   const a = randomInt(rng, min, max);
   const b = randomInt(rng, min, max);
-  return { op: 'add', a, b, answer: a + b };
+  return { op: 'add', a, b, answer: a + b, missingSlot: 'answer' };
 }
 
 function generateSubtraction(config: OperationConfig, rng: Rng): Problem {
@@ -108,7 +159,7 @@ function generateSubtraction(config: OperationConfig, rng: Rng): Problem {
   if (config.noNegative && b > a) {
     [a, b] = [b, a];
   }
-  return { op: 'sub', a, b, answer: a - b };
+  return { op: 'sub', a, b, answer: a - b, missingSlot: 'answer' };
 }
 
 function generateMultiplication(config: OperationConfig, rng: Rng): Problem {
@@ -116,7 +167,7 @@ function generateMultiplication(config: OperationConfig, rng: Rng): Problem {
   const a =
     config.tables && config.tables.length > 0 ? pick(rng, config.tables) : randomInt(rng, min, max);
   const b = randomInt(rng, min, max);
-  return { op: 'mul', a, b, answer: a * b };
+  return { op: 'mul', a, b, answer: a * b, missingSlot: 'answer' };
 }
 
 function generateDivision(config: OperationConfig, rng: Rng): Problem {
@@ -134,7 +185,7 @@ function generateDivision(config: OperationConfig, rng: Rng): Problem {
     dividend += remainder;
   }
 
-  return { op: 'div', a: dividend, b: divisor, answer: quotient, remainder };
+  return { op: 'div', a: dividend, b: divisor, answer: quotient, remainder, missingSlot: 'answer' };
 }
 
 function withinRange(value: number, range: Range): boolean {

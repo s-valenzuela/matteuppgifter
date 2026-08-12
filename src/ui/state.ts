@@ -34,6 +34,7 @@ export function createDefaultState(): AppState {
       count: 30,
       avoidDuplicates: true,
       shuffle: true,
+      missingNumber: false,
       seed: randomSeed(),
     },
     document: {

@@ -1,4 +1,4 @@
-import type { AnswerStyle, DocumentLayout, Operation, OperationConfig } from '../types';
+import type { AnswerStyle, DocumentLayout, Operation, OperationConfig, Range } from '../types';
 import { createDefaultState, type AppState } from '../ui/state';
 
 const OPERATION_KEYS: readonly Operation[] = ['add', 'sub', 'mul', 'div'];
@@ -29,6 +29,7 @@ export function encodeState(state: AppState): URLSearchParams {
   params.set('n', String(state.generator.count));
   params.set('dup', boolStr(state.generator.avoidDuplicates));
   params.set('shuffle', boolStr(state.generator.shuffle));
+  params.set('missing', boolStr(state.generator.missingNumber));
   params.set('seed', String(state.generator.seed));
 
   params.set('cols', String(state.document.columns));
@@ -64,6 +65,7 @@ export function decodeState(search: string): AppState | null {
   state.generator.count = intOr(params.get('n'), fallback.generator.count);
   state.generator.avoidDuplicates = boolOr(params.get('dup'), fallback.generator.avoidDuplicates);
   state.generator.shuffle = boolOr(params.get('shuffle'), fallback.generator.shuffle);
+  state.generator.missingNumber = boolOr(params.get('missing'), fallback.generator.missingNumber);
   state.generator.seed = intOr(params.get('seed'), fallback.generator.seed);
 
   state.document.columns = decodeColumns(params.get('cols'), fallback.document.columns);
@@ -91,13 +93,19 @@ function encodeOperation(key: Operation, cfg: OperationConfig): string {
       parts.push(boolStr(cfg.allowRemainder ?? false));
       break;
     case 'add':
+      parts.push('');
       break;
   }
+  // Alltid sist, oavsett räknesätt, så indexplatsen är förutsägbar vid
+  // avkodning. Talen separeras med "," snarare än ":" (som redan används
+  // mellan hela delarna ovan) eftersom ett negativt gräns-tal annars skulle
+  // ge ett extra "-"-tecken som kolliderar med separatorn.
+  parts.push(cfg.resultRange ? `${cfg.resultRange.min},${cfg.resultRange.max}` : '');
   return parts.join(':');
 }
 
 function decodeOperation(key: Operation, raw: string, fallback: OperationConfig): OperationConfig {
-  const [rawMin, rawMax, rawExtra] = raw.split(':');
+  const [rawMin, rawMax, rawExtra, rawResultRange] = raw.split(':');
   const min = numberOr(rawMin, fallback.operandRange.min);
   const max = numberOr(rawMax, fallback.operandRange.max);
   const cfg: OperationConfig = { enabled: true, operandRange: { min, max } };
@@ -121,7 +129,16 @@ function decodeOperation(key: Operation, raw: string, fallback: OperationConfig)
       break;
   }
 
+  cfg.resultRange = decodeResultRange(rawResultRange);
   return cfg;
+}
+
+function decodeResultRange(raw: string | undefined): Range | undefined {
+  if (!raw) return undefined;
+  const [minRaw, maxRaw] = raw.split(',');
+  const min = Number(minRaw);
+  const max = Number(maxRaw);
+  return Number.isFinite(min) && Number.isFinite(max) ? { min, max } : undefined;
 }
 
 function disabledOperation(fallback: OperationConfig): OperationConfig {

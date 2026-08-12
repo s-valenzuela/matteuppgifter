@@ -4,7 +4,7 @@ En webbapp för att skapa utskrivbara övningsblad i addition, subtraktion,
 multiplikation och division. Allt körs i webbläsaren — ingen backend, ingen
 inloggning, inga uppgifter lämnar din dator.
 
-**Testa den:** https://s-valenzuela.github.io/matteuppgifter/
+**Testa den:** https://matteuppgifter.se/
 
 ## Funktioner
 
@@ -33,7 +33,7 @@ npm install
 npm run dev
 ```
 
-Öppna länken som skrivs ut (`http://localhost:5173/matteuppgifter/`).
+Öppna länken som skrivs ut (`http://localhost:5173/`).
 
 ## Skript
 
@@ -78,5 +78,6 @@ Pages via GitHub Actions vid push till `main`. `.github/workflows/ci.yml`
 kör typkontroll, lint, formatteringskontroll, tester och bygge på varje
 push/PR.
 
-`vite.config.ts` sätter `base: '/matteuppgifter/'` så länkar och
-tillgångar fungerar under projektsidans undersökväg.
+Sidan körs på den egna domänen [matteuppgifter.se](https://matteuppgifter.se/)
+(`public/CNAME`), inte under GitHub Pages standardadress — `vite.config.ts`
+sätter därför `base: '/'`.

@@ -221,8 +221,8 @@ blad kan delas eller bokmärkas.
 
 - `.github/workflows/deploy.yml`: bygger med Vite och publicerar `dist/` till GitHub Pages
   vid push till `main`. Pages sätts till "GitHub Actions" som källa.
-- `vite.config.ts` sätter `base: '/matteuppgifter/'` så att relativa sökvägar fungerar under
-  projektsidans undersökväg.
+- Sidan körs på den egna domänen matteuppgifter.se (`public/CNAME`) i stället för under
+  GitHub Pages standardadress — `vite.config.ts` sätter därför `base: '/'`.
 - Inga externa körtidsanrop — appen fungerar offline efter första besöket.
   Enkel service worker + web app manifest läggs till i M5 så den kan "installeras" och
   användas utan nät.

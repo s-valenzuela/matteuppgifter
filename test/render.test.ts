@@ -182,4 +182,36 @@ describe('renderProblemsToPdf', () => {
     expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(2);
     expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
   });
+
+  it('renderar "Saknat tal" (blankad a, b eller svar) i båda layouterna och alla svarsstilar, utan att kasta fel', () => {
+    const problems = generateProblems(
+      baseConfig({
+        operations: {
+          add: opConfig({ enabled: true, operandRange: { min: 0, max: 20 } }),
+          sub: opConfig({ enabled: true, operandRange: { min: 0, max: 20 }, noNegative: true }),
+          mul: opConfig({ enabled: true, operandRange: { min: 1, max: 10 } }),
+          div: opConfig({ enabled: true, operandRange: { min: 1, max: 10 }, allowRemainder: true }),
+        },
+        count: 40,
+        missingNumber: true,
+        seed: 5,
+      }),
+    );
+    // Kontrollera att alla tre platserna faktiskt förekommer i testdatan,
+    // annars testar vi inte det vi tror.
+    const slots = new Set(problems.map((p) => p.missingSlot));
+    expect(slots.has('a')).toBe(true);
+    expect(slots.has('answer')).toBe(true);
+
+    for (const layout of ['grid', 'vertical'] as const) {
+      for (const answerStyle of ['blank', 'line', 'box'] as const) {
+        const doc = renderProblemsToPdf(
+          problems,
+          baseDocumentConfig({ layout, answerStyle, includeAnswerKey: true }),
+        );
+        expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+        expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
 });

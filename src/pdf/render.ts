@@ -19,6 +19,15 @@ const BOX_SIZE_MM = 7;
 const GAP_AFTER_PROMPT_MM = 2;
 /** Luft runt operatorn och likhetstecknet, i mm. */
 const SYMBOL_GAP_MM = 1.5;
+/**
+ * Extra avstånd (utöver VERTICAL_RULE_GAP_FACTOR) mellan operand 2 och
+ * strecket när operand 2 själv är den tomma platsen i "Saknat tal"-läget —
+ * annars hamnar tomrummets egen linje nästan ovanpå strecket och de flyter
+ * ihop visuellt till en enda linje. Ryms inom den luft (+0.5) som
+ * VERTICAL_ROW_EXTRA_GAP_FACTOR i layout.ts redan reserverar utöver
+ * streck+ruta, så radhöjden behöver inte räknas om.
+ */
+const VERTICAL_RULE_GAP_EXTRA_FOR_B_FACTOR = 0.3;
 
 /**
  * Mått som är gemensamma för alla uppgifter i dokumentet, så att operand A,
@@ -168,7 +177,12 @@ function drawProblem(
   }
 }
 
-/** Vågrätt: "12 + 7 = ____". */
+/**
+ * Vågrätt: "12 + 7 = ____" — eller, i "Saknat tal"-läget, tomrummet på en
+ * annan plats: "__ + 7 = 19" / "12 + __ = 19". Vilken plats som är tom styrs
+ * av problem.missingSlot (alltid 'answer' i det vanliga läget). I facit
+ * (showAnswers) visas alltid alla tre delarna, oavsett missingSlot.
+ */
 function drawGridProblem(
   doc: jsPDF,
   problem: Problem,
@@ -180,9 +194,15 @@ function drawGridProblem(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(config.fontSizePt);
 
+  const blankSlot = showAnswers ? null : problem.missingSlot;
+
   // Operand A högerjusteras mot slutet av sin kolumn ...
   const aX = position.xMm + metrics.slotAWidthMm;
-  doc.text(String(problem.a), aX, position.yMm, { align: 'right' });
+  if (blankSlot === 'a') {
+    drawOperandBlank(doc, aX, position.yMm, metrics.slotAWidthMm, config.answerStyle);
+  } else {
+    doc.text(String(problem.a), aX, position.yMm, { align: 'right' });
+  }
 
   // ... operatorn centreras i en egen fast bred kolumn (+/-/×/÷ är inte lika
   // breda i Helvetica, så utan det här skulle likhetstecknet hoppa i sidled
@@ -199,14 +219,19 @@ function drawGridProblem(
   // ... och operand B högerjusteras på samma sätt som A, så att både + och =
   // hamnar på samma x-position rad efter rad genom hela dokumentet.
   const bX = symbolSlotStartX + metrics.operatorSlotWidthMm + SYMBOL_GAP_MM + metrics.slotBWidthMm;
-  doc.text(String(problem.b), bX, position.yMm, { align: 'right' });
+  if (blankSlot === 'b') {
+    drawOperandBlank(doc, bX, position.yMm, metrics.slotBWidthMm, config.answerStyle);
+  } else {
+    doc.text(String(problem.b), bX, position.yMm, { align: 'right' });
+  }
 
   const equalsX = bX + SYMBOL_GAP_MM;
   doc.text('=', equalsX, position.yMm);
 
   const answerX = equalsX + doc.getTextWidth('=') + GAP_AFTER_PROMPT_MM;
 
-  if (showAnswers) {
+  if (blankSlot !== 'answer') {
+    // Facit, eller "Saknat tal" med tomrum på a/b — svaret är känt/givet.
     doc.text(formatAnswer(problem), answerX, position.yMm);
     return;
   }
@@ -221,6 +246,30 @@ function drawGridProblem(
     case 'box':
       doc.rect(answerX, position.yMm - BOX_SIZE_MM + 2, BOX_SIZE_MM, BOX_SIZE_MM);
       break;
+  }
+}
+
+/**
+ * Ritar en tom plats i stället för en operand, högerjusterad mot rightEdgeX
+ * med exakt bredden widthMm — samma bredd som kolumnen redan reserverat åt
+ * den siffran (metrics.slotAWidthMm/slotBWidthMm), så att markeringen aldrig
+ * kan sticka ut i föregående kolumn. Det vanliga understreck-teckenutdraget
+ * (BLANK_PLACEHOLDER) är kalibrerat för svarsfältets fria yta och skulle
+ * kunna bli bredare än den smala, exakt reserverade sifferkolumnen — därför
+ * ritas 'blank' här som samma korta linje som 'line', bara 'box' skiljer sig.
+ */
+function drawOperandBlank(
+  doc: jsPDF,
+  rightEdgeX: number,
+  yMm: number,
+  widthMm: number,
+  answerStyle: DocumentConfig['answerStyle'],
+): void {
+  const leftEdgeX = rightEdgeX - widthMm;
+  if (answerStyle === 'box') {
+    doc.rect(leftEdgeX, yMm - BOX_SIZE_MM + 2, widthMm, BOX_SIZE_MM);
+  } else {
+    doc.line(leftEdgeX, yMm + 1, rightEdgeX, yMm + 1);
   }
 }
 
@@ -259,18 +308,37 @@ function drawVerticalProblem(
   const answerY = position.yMm;
   const operand2Y = answerY - lineStepMm;
   const operand1Y = operand2Y - lineStepMm;
-  const ruleY = operand2Y + fontSizeMm * VERTICAL_RULE_GAP_FACTOR;
 
-  doc.text(String(problem.a), rightEdgeX, operand1Y, { align: 'right' });
+  const blankSlot = showAnswers ? null : problem.missingSlot;
+
+  // Om operand 2 (precis ovanför strecket) är den tomma platsen, flyttas
+  // strecket ner ett extra litet stycke — annars hamnar tomrummets egen
+  // linje (drawOperandBlank) nästan ovanpå strecket och de två flyter ihop
+  // till en enda linje, se VERTICAL_RULE_GAP_EXTRA_FOR_B_FACTOR-kommentaren.
+  const ruleGapFactor =
+    VERTICAL_RULE_GAP_FACTOR + (blankSlot === 'b' ? VERTICAL_RULE_GAP_EXTRA_FOR_B_FACTOR : 0);
+  const ruleY = operand2Y + fontSizeMm * ruleGapFactor;
+
+  if (blankSlot === 'a') {
+    drawOperandBlank(doc, rightEdgeX, operand1Y, operandColumnWidthMm, config.answerStyle);
+  } else {
+    doc.text(String(problem.a), rightEdgeX, operand1Y, { align: 'right' });
+  }
 
   const symbol = OPERATION_SYMBOLS[problem.op];
   const symbolWidth = doc.getTextWidth(symbol);
   doc.text(symbol, position.xMm + (metrics.operatorSlotWidthMm - symbolWidth) / 2, operand2Y);
-  doc.text(String(problem.b), rightEdgeX, operand2Y, { align: 'right' });
+
+  if (blankSlot === 'b') {
+    drawOperandBlank(doc, rightEdgeX, operand2Y, operandColumnWidthMm, config.answerStyle);
+  } else {
+    doc.text(String(problem.b), rightEdgeX, operand2Y, { align: 'right' });
+  }
 
   doc.line(position.xMm, ruleY, rightEdgeX, ruleY);
 
-  if (showAnswers) {
+  if (blankSlot !== 'answer') {
+    // Facit, eller "Saknat tal" med tomrum på a/b — svaret är känt/givet.
     doc.text(formatAnswer(problem), rightEdgeX, answerY, { align: 'right' });
     return;
   }

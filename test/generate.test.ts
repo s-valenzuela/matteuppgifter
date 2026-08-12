@@ -255,4 +255,159 @@ describe('generateProblems', () => {
     const b = generateProblems({ ...config, seed: 2 });
     expect(a).not.toEqual(b);
   });
+
+  describe('resultRange', () => {
+    it('respekterar en gräns på svaret för subtraktion', () => {
+      const config = baseConfig({
+        operations: {
+          add: opConfig(),
+          sub: opConfig({
+            enabled: true,
+            operandRange: { min: 0, max: 20 },
+            resultRange: { min: -5, max: 5 },
+          }),
+          mul: opConfig(),
+          div: opConfig(),
+        },
+        count: 40,
+      });
+
+      for (const p of generateProblems(config)) {
+        expect(p.answer).toBeGreaterThanOrEqual(-5);
+        expect(p.answer).toBeLessThanOrEqual(5);
+      }
+    });
+
+    it('respekterar en gräns på svaret (produkten) för multiplikation', () => {
+      const config = baseConfig({
+        operations: {
+          add: opConfig(),
+          sub: opConfig(),
+          mul: opConfig({
+            enabled: true,
+            operandRange: { min: 0, max: 10 },
+            resultRange: { min: 0, max: 12 },
+          }),
+          div: opConfig(),
+        },
+        count: 40,
+      });
+
+      for (const p of generateProblems(config)) {
+        expect(p.answer).toBeGreaterThanOrEqual(0);
+        expect(p.answer).toBeLessThanOrEqual(12);
+      }
+    });
+
+    it('respekterar en gräns på svaret (kvoten) för division', () => {
+      const config = baseConfig({
+        operations: {
+          add: opConfig(),
+          sub: opConfig(),
+          mul: opConfig(),
+          div: opConfig({
+            enabled: true,
+            operandRange: { min: 1, max: 12 },
+            resultRange: { min: 1, max: 3 },
+          }),
+        },
+        count: 40,
+      });
+
+      for (const p of generateProblems(config)) {
+        expect(p.answer).toBeGreaterThanOrEqual(1);
+        expect(p.answer).toBeLessThanOrEqual(3);
+        // resultRange styr kvoten, inte divisorn — täljaren måste ändå stämma.
+        expect(p.a).toBe(p.b * p.answer);
+      }
+    });
+  });
+
+  describe('missingNumber ("Saknat tal")', () => {
+    it('ger alltid missingSlot "answer" när saknat tal är avstängt', () => {
+      const config = baseConfig({
+        operations: {
+          add: opConfig({ enabled: true, operandRange: { min: 0, max: 20 } }),
+          sub: opConfig(),
+          mul: opConfig(),
+          div: opConfig(),
+        },
+        count: 20,
+        missingNumber: false,
+      });
+
+      for (const p of generateProblems(config)) {
+        expect(p.missingSlot).toBe('answer');
+      }
+    });
+
+    it('väljer olika platser (a, b, svar) när saknat tal är påslaget', () => {
+      const config = baseConfig({
+        operations: {
+          add: opConfig({ enabled: true, operandRange: { min: 0, max: 20 } }),
+          sub: opConfig(),
+          mul: opConfig(),
+          div: opConfig(),
+        },
+        count: 60,
+        missingNumber: true,
+        seed: 7,
+      });
+
+      const slots = new Set(generateProblems(config).map((p) => p.missingSlot));
+      expect(slots.size).toBeGreaterThan(1);
+    });
+
+    it('blankar aldrig divisorn (b) för division, bara täljare eller svar', () => {
+      const config = baseConfig({
+        operations: {
+          add: opConfig(),
+          sub: opConfig(),
+          mul: opConfig(),
+          div: opConfig({ enabled: true, operandRange: { min: 1, max: 10 } }),
+        },
+        count: 60,
+        missingNumber: true,
+        seed: 3,
+      });
+
+      for (const p of generateProblems(config)) {
+        expect(p.missingSlot).not.toBe('b');
+      }
+    });
+
+    it('varje uppgift förblir korrekt lösbar oavsett vilken plats som saknas', () => {
+      const config = baseConfig({
+        operations: {
+          add: opConfig({ enabled: true, operandRange: { min: 0, max: 20 } }),
+          sub: opConfig({ enabled: true, operandRange: { min: 0, max: 20 }, noNegative: true }),
+          mul: opConfig({ enabled: true, operandRange: { min: 1, max: 10 } }),
+          div: opConfig({ enabled: true, operandRange: { min: 1, max: 10 } }),
+        },
+        count: 200,
+        missingNumber: true,
+        seed: 42,
+      });
+
+      for (const p of generateProblems(config)) {
+        // a, b och answer är oförändrade oavsett missingSlot — det är bara
+        // render.ts som väljer vilken av dem som visas tom. Facit ska alltid
+        // stämma matematiskt.
+        switch (p.op) {
+          case 'add':
+            expect(p.a + p.b).toBe(p.answer);
+            break;
+          case 'sub':
+            expect(p.a - p.b).toBe(p.answer);
+            break;
+          case 'mul':
+            expect(p.a * p.b).toBe(p.answer);
+            break;
+          case 'div':
+            expect(p.b * p.answer + (p.remainder ?? 0)).toBe(p.a);
+            break;
+        }
+      }
+    });
+  });
 });

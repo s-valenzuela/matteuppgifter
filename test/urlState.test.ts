@@ -28,6 +28,7 @@ describe('encodeState / decodeState', () => {
         count: 42,
         avoidDuplicates: false,
         shuffle: false,
+        missingNumber: false,
         seed: 987654,
       },
       document: {
@@ -60,6 +61,7 @@ describe('encodeState / decodeState', () => {
         count: 42,
         avoidDuplicates: true,
         shuffle: true,
+        missingNumber: true,
         seed: 987654,
       },
       document: {
@@ -127,5 +129,30 @@ describe('encodeState / decodeState', () => {
     };
     const decoded = decodeState(`?${encodeState(state).toString()}`);
     expect(decoded?.generator.operations.mul.tables).toEqual([3, 7]);
+  });
+
+  it('behåller en gräns på svaret (resultRange), inklusive negativa tal, genom en tur-och-retur', () => {
+    const state = createDefaultState();
+    state.generator.operations.sub = {
+      enabled: true,
+      operandRange: { min: 0, max: 20 },
+      resultRange: { min: -8, max: 8 },
+    };
+    const decoded = decodeState(`?${encodeState(state).toString()}`);
+    expect(decoded?.generator.operations.sub.resultRange).toEqual({ min: -8, max: 8 });
+  });
+
+  it('utelämnad resultRange förblir odefinierad genom en tur-och-retur', () => {
+    const state = createDefaultState();
+    state.generator.operations.add.resultRange = undefined;
+    const decoded = decodeState(`?${encodeState(state).toString()}`);
+    expect(decoded?.generator.operations.add.resultRange).toBeUndefined();
+  });
+
+  it('kodar och avkodar "Saknat tal"-läget', () => {
+    const state = createDefaultState();
+    state.generator.missingNumber = true;
+    const decoded = decodeState(`?${encodeState(state).toString()}`);
+    expect(decoded?.generator.missingNumber).toBe(true);
   });
 });
