@@ -9,7 +9,7 @@ export interface OperationConfig {
   enabled: boolean;
   /** Talområde för operanderna (för division: divisor och kvot). */
   operandRange: Range;
-  /** Valfri gräns på svaret. Används i M1 endast för addition. */
+  /** Valfri gräns på svaret. */
   resultRange?: Range;
   /** Subtraktion: byt plats på operanderna i stället för att ge ett negativt svar. */
   noNegative?: boolean;
@@ -27,8 +27,13 @@ export interface GeneratorConfig {
   avoidDuplicates: boolean;
   /** Blanda ordningen på uppgifterna när fler än ett räknesätt är valt. */
   shuffle: boolean;
+  /** Saknat tal: slumpar vilken del av uppgiften (a, b eller svaret) som är tom, t.ex. "3 + __ = 10". */
+  missingNumber: boolean;
   seed: number;
 }
+
+/** Vilken del av uppgiften som är tom att fylla i. Standard 'answer' (den vanliga varianten). */
+export type MissingSlot = 'a' | 'b' | 'answer';
 
 export interface Problem {
   op: Operation;
@@ -38,6 +43,7 @@ export interface Problem {
   answer: number;
   /** Endast satt för division när allowRemainder är true. */
   remainder?: number;
+  missingSlot: MissingSlot;
 }
 
 /** Hur svarsfältet ritas när facit inte visas. */

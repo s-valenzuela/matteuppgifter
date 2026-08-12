@@ -38,6 +38,8 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
         enabled: q<HTMLInputElement>(container, `#op-${key}-enabled`),
         min: q<HTMLInputElement>(container, `#op-${key}-min`),
         max: q<HTMLInputElement>(container, `#op-${key}-max`),
+        resultMin: q<HTMLInputElement>(container, `#op-${key}-resultMin`),
+        resultMax: q<HTMLInputElement>(container, `#op-${key}-resultMax`),
       },
     ]),
   );
@@ -49,6 +51,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const countEl = q<HTMLInputElement>(container, '#count');
   const avoidDuplicatesEl = q<HTMLInputElement>(container, '#avoidDuplicates');
   const shuffleEl = q<HTMLInputElement>(container, '#shuffle');
+  const missingNumberEl = q<HTMLInputElement>(container, '#missingNumber');
   const seedEl = q<HTMLInputElement>(container, '#seed');
   const seedEditButton = q<HTMLButtonElement>(container, '#seed-edit');
 
@@ -77,6 +80,8 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
       els.enabled.checked = cfg.enabled;
       els.min.value = String(cfg.operandRange.min);
       els.max.value = String(cfg.operandRange.max);
+      els.resultMin.value = cfg.resultRange ? String(cfg.resultRange.min) : '';
+      els.resultMax.value = cfg.resultRange ? String(cfg.resultRange.max) : '';
     }
     subNoNegative.checked = state.generator.operations.sub.noNegative ?? false;
     mulTables.value = state.generator.operations.mul.tables?.join(',') ?? '';
@@ -85,6 +90,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     countEl.value = String(state.generator.count);
     avoidDuplicatesEl.checked = state.generator.avoidDuplicates;
     shuffleEl.checked = state.generator.shuffle;
+    missingNumberEl.checked = state.generator.missingNumber;
     seedEl.value = String(state.generator.seed);
     seedEl.readOnly = true;
 
@@ -123,6 +129,26 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
         emitChange();
       }
     });
+
+    // Tomt fält (endera eller båda) betyder "ingen gräns" (resultRange
+    // ospecificerad) — bara när båda är ifyllda med giltiga tal aktiveras den.
+    const updateResultRange = () => {
+      const minRaw = els.resultMin.value.trim();
+      const maxRaw = els.resultMax.value.trim();
+      if (minRaw === '' || maxRaw === '') {
+        cfg().resultRange = undefined;
+        emitChange();
+        return;
+      }
+      const min = Number(minRaw);
+      const max = Number(maxRaw);
+      if (Number.isFinite(min) && Number.isFinite(max)) {
+        cfg().resultRange = { min, max };
+        emitChange();
+      }
+    };
+    els.resultMin.addEventListener('input', updateResultRange);
+    els.resultMax.addEventListener('input', updateResultRange);
   }
 
   subNoNegative.addEventListener('change', () => {
@@ -167,6 +193,10 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   });
   shuffleEl.addEventListener('change', () => {
     state.generator.shuffle = shuffleEl.checked;
+    emitChange();
+  });
+  missingNumberEl.addEventListener('change', () => {
+    state.generator.missingNumber = missingNumberEl.checked;
     emitChange();
   });
   // Seedfältet är skrivskyddat som standard — det är sällan man vill skriva
@@ -270,6 +300,10 @@ function operationCardHtml(key: Operation, extraHtml: string): string {
         <label>Från <input type="number" id="op-${key}-min" step="1" /></label>
         <label>Till <input type="number" id="op-${key}-max" step="1" /></label>
       </div>
+      <div class="op-range op-range-result">
+        <label>Svar min <input type="number" id="op-${key}-resultMin" step="1" placeholder="valfritt" /></label>
+        <label>Svar max <input type="number" id="op-${key}-resultMax" step="1" placeholder="valfritt" /></label>
+      </div>
       ${extraHtml}
     </fieldset>
   `;
@@ -351,6 +385,7 @@ function renderTemplate(): string {
         <label><input type="checkbox" id="showDate" /> Datum-fält</label>
         <label><input type="checkbox" id="avoidDuplicates" /> Undvik dubbletter</label>
         <label><input type="checkbox" id="shuffle" /> Blanda ordningen</label>
+        <label><input type="checkbox" id="missingNumber" /> Saknat tal (t.ex. 3 + __ = 10)</label>
       </div>
       <label>
         Seed

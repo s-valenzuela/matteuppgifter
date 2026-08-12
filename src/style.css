@@ -184,6 +184,16 @@ legend {
   width: 4.5rem;
 }
 
+/* Gräns på svaret är valfri och mindre använd än talområdet ovanför den —
+   nedtonad så den inte konkurrerar visuellt med Från/Till. */
+.op-range-result {
+  margin-top: 0.3rem;
+}
+
+.op-range-result label {
+  color: var(--text-muted);
+}
+
 .op-extra {
   display: block;
   margin-top: 0.5rem;
