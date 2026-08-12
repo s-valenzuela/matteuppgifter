@@ -17,7 +17,7 @@ const DOCUMENT_LAYOUTS: readonly DocumentLayout[] = ['grid', 'vertical'];
 const SHEET_TYPES: readonly SheetType[] = ['arithmetic', 'clock'];
 const CLOCK_STEPS: readonly ClockStep[] = ['hour', 'half', 'quarter', 'five'];
 const CLOCK_PHRASINGS: readonly TwentyFortyPhrasing[] = ['halv', 'over-i'];
-const CLOCK_DIRECTIONS: readonly ClockDirectionMode[] = ['read', 'draw', 'mixed'];
+const CLOCK_DIRECTIONS: readonly ClockDirectionMode[] = ['read', 'draw', 'digital', 'mixed'];
 
 /**
  * Speglar AppState i en query-sträng så att ett blad kan delas eller

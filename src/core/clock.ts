@@ -121,5 +121,11 @@ function clockKey(hour: number, minute: number): string {
 }
 
 function resolveDirection(mode: ClockDirectionMode, rng: Rng): ClockDirection {
-  return mode === 'mixed' ? pick(rng, ['read', 'draw']) : mode;
+  return mode === 'mixed' ? pick(rng, ['read', 'draw', 'digital']) : mode;
+}
+
+/** T.ex. "06:30" — samma tvåsiffriga urtavla (1–12) som problem.hour redan
+ * använder, bara nollutfylld, som på en digital väckarklocka. */
+export function digitalTime(hour: number, minute: number): string {
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
