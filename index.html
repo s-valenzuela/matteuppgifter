@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Matteuppgifter — PDF-generator</title>
+    <meta
+      name="description"
+      content="Skapa övningsblad med addition, subtraktion, multiplikation och division — allt körs i webbläsaren, inget lämnar din dator."
+    />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#17181a" media="(prefers-color-scheme: dark)" />
+  </head>
+  <body>
+    <main>
+      <h1>Matteuppgifter</h1>
+      <p class="subtitle">
+        Skapa övningsblad med addition, subtraktion, multiplikation och division — allt körs i
+        webbläsaren, inget lämnar din dator.
+      </p>
+
+      <div class="quickstart" id="quickstart"></div>
+
+      <div id="warnings"></div>
+
+      <div class="app-layout">
+        <div class="settings-panel" id="settings-panel"></div>
+        <div class="preview-panel">
+          <iframe id="preview" title="Förhandsvisning av PDF"></iframe>
+          <div class="actions">
+            <button type="button" id="download-button" class="primary">Ladda ner PDF</button>
+            <button type="button" id="print-button">Skriv ut</button>
+            <button type="button" id="copy-link-button">Kopiera länk</button>
+            <button
+              type="button"
+              id="seed-randomize-button"
+              class="icon-button-labelled"
+              title="Slumpa om en ny seed"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                width="16"
+                height="16"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path
+                  d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                ></path>
+              </svg>
+              <span>Slumpa om</span>
+            </button>
+            <button type="button" id="reset-button">Återställ</button>
+            <span id="copy-link-status" class="copy-link-status" aria-live="polite"></span>
+          </div>
+        </div>
+      </div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

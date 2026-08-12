@@ -1,0 +1,376 @@
+:root {
+  color-scheme: light dark;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+
+  /* Ljust tema (standard). Mörkt tema definieras genom att skriva om
+     samma variabler under @media (prefers-color-scheme: dark) nedan —
+     reglerna själva bryr sig aldrig om vilket tema som är aktivt. */
+  --bg: #f7f7f5;
+  --bg-panel: #fff;
+  --text: #1a1a1a;
+  --text-muted: #555;
+  --border-panel: #ddd;
+  --border-control: #ccc;
+  --border-chip: #bbb;
+  --control-hover-bg: #f0f0f0;
+  --readonly-bg: #f5f5f5;
+  --accent-bg: #1a1a1a;
+  --accent-bg-hover: #333;
+  --accent-text: #fff;
+  --success: #2a7a2a;
+  --warning-bg: #fff7e0;
+  --warning-border: #e8c766;
+  --focus-ring: #2563eb;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17181a;
+    --bg-panel: #212225;
+    --text: #f0f0ee;
+    --text-muted: #a8a8a8;
+    --border-panel: #3a3b3e;
+    --border-control: #4a4b4e;
+    --border-chip: #55565a;
+    --control-hover-bg: #2a2b2e;
+    --readonly-bg: #292a2d;
+    --accent-bg: #e8e8e6;
+    --accent-bg-hover: #c9c9c7;
+    --accent-text: #17181a;
+    --success: #5fbf5f;
+    --warning-bg: #3a3320;
+    --warning-border: #8a7332;
+    --focus-ring: #6d9bff;
+  }
+}
+
+/* Respekterar `prefers-reduced-motion` (avsnitt 6 i PLAN.md) — appen har
+   inga dekorativa animationer, men det här ser till att den håller sig
+   sådan även om något läggs till senare, och stänger av eventuella
+   webbläsarstandardövergångar (t.ex. på <select>/<details>). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 1.5rem;
+  background: var(--bg);
+  color: var(--text);
+}
+
+main {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.6rem;
+}
+
+.subtitle {
+  margin: 0 0 1.25rem;
+  color: var(--text-muted);
+}
+
+.quickstart {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.quickstart button {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.quickstart button:hover {
+  background: var(--accent-bg-hover);
+}
+
+.app-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.settings-panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-panel);
+  border-radius: 12px;
+  padding: 1rem 1.25rem 1.5rem;
+}
+
+.settings-panel section {
+  margin-bottom: 1.5rem;
+}
+
+.settings-panel h2 {
+  font-size: 1.05rem;
+  margin: 0 0 0.6rem;
+}
+
+fieldset {
+  border: 1px solid var(--border-panel);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem 0.8rem;
+  margin: 0;
+}
+
+legend {
+  font-weight: 600;
+  padding: 0 0.3rem;
+}
+
+.op-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 480px) {
+  .op-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.op-card:has(legend input[type='checkbox']:not(:checked)) {
+  opacity: 0.55;
+}
+
+.op-range {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.4rem;
+}
+
+.op-range label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+}
+
+.op-range input {
+  width: 4.5rem;
+}
+
+.op-extra {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.level-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.level-chips-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-right: 0.2rem;
+}
+
+.level-chips button {
+  border: 1px solid var(--border-chip);
+  background: var(--bg-panel);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.level-chips button:hover {
+  background: var(--control-hover-bg);
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem 1rem;
+  margin-bottom: 0.6rem;
+}
+
+@media (max-width: 480px) {
+  .field-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+label {
+  font-size: 0.9rem;
+  display: block;
+}
+
+input[type='text'],
+input[type='number'] {
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border-control);
+  border-radius: 6px;
+  margin-top: 0.2rem;
+  background: var(--bg-panel);
+  color: var(--text);
+}
+
+select {
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border-control);
+  border-radius: 6px;
+  margin-top: 0.2rem;
+  background: var(--bg-panel);
+  color: var(--text);
+}
+
+input[type='checkbox'] {
+  margin-right: 0.35rem;
+}
+
+.seed-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+}
+
+.seed-field input {
+  width: auto;
+  flex: 1 1 8ch;
+  margin-top: 0;
+}
+
+.seed-field input[readonly] {
+  background: var(--readonly-bg);
+  color: var(--text-muted);
+}
+
+.icon-button,
+.icon-button-labelled {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-control);
+  background: var(--bg-panel);
+  color: var(--text);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.icon-button:hover,
+.icon-button-labelled:hover {
+  background: var(--control-hover-bg);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+}
+
+.actions button {
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-control);
+  background: var(--bg-panel);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.actions button.primary {
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  border-color: var(--accent-bg);
+}
+
+.actions button.primary:hover {
+  background: var(--accent-bg-hover);
+}
+
+.actions button:hover {
+  background: var(--control-hover-bg);
+}
+
+.copy-link-status {
+  align-self: center;
+  font-size: 0.85rem;
+  color: var(--success);
+}
+
+.warnings {
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.warnings ul {
+  margin: 0.3rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.preview-panel iframe {
+  width: 100%;
+  min-height: 80vh;
+  border: 1px solid var(--border-panel);
+  border-radius: 12px;
+  background: #fff;
+}
+
+@media (max-width: 900px) {
+  .preview-panel iframe {
+    min-height: 60vh;
+  }
+}
+
+/* Tydlig, tema-medveten fokusmarkering för tangentbordsnavigering (avsnitt 6
+   i PLAN.md). `:focus-visible` gör att musklick inte utlöser ringen, bara
+   tangentbordsfokus — precis det AA-kravet handlar om, inte att allt ska ha
+   en ring hela tiden. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
