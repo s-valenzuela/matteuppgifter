@@ -160,6 +160,27 @@ const FRACTION_BLANK_BOX_REACH_ABOVE_MM = 5;
 const ESTIMATED_CHARS_PER_PROBLEM_FRACTION_TEXT = 13;
 
 /**
+ * Geometrifigurens målstorlek — samma faktor/min/max som klockan och bråket
+ * (se ovan) så att alla tre figurbaserade bladtyperna känns lika stora.
+ * Rutan rymmer BÅDE figuren och dess måttetiketter; geometryFigure.ts drar in
+ * själva figuren så att etiketterna får plats innanför samma ruta, vilket gör
+ * att radhöjden nedan kan räknas precis som klockans.
+ */
+const GEOMETRY_FIGURE_FONT_FACTOR = 8;
+const GEOMETRY_FIGURE_MIN_MM = 16;
+const GEOMETRY_FIGURE_MAX_MM = 65;
+/** Luft runt figuren i kolumnbredden, respektive mellan kolumner. */
+const GEOMETRY_COLUMN_GUTTER_MM = 6;
+/** Avstånd mellan figurrutans nederkant och svarsradens baslinje, i mm —
+ * samma princip som CLOCK_FACE_LABEL_GAP_MM. Exporterad så att render.ts
+ * placerar figuren utifrån exakt samma tal som här reserverats. */
+export const GEOMETRY_FIGURE_LABEL_GAP_MM = 5;
+/** Extra luft under svarsraden, för nedstick, innan nästa rads figur. */
+const GEOMETRY_LABEL_DESCENDER_MM = 2;
+/** Extra luft mellan en geometrirads block och nästa rads block. */
+const GEOMETRY_ROW_EXTRA_GAP_MM = 4;
+
+/**
  * Hur långt en obesvarad ELLER besvarad bråkuppgifts täljar/streck/nämnare
  * -stapel sträcker sig OVANFÖR nämnarens baslinje — den textskalade
  * varianten (siffror, se drawStackedFractionText i render.ts) ELLER den
@@ -175,7 +196,8 @@ export function fractionStackReachAboveMm(fontSizeMm: number): number {
   );
 }
 
-export type DocumentLayoutMode = 'grid' | 'vertical' | 'clock' | 'fraction' | 'fractionText';
+export type DocumentLayoutMode =
+  'grid' | 'vertical' | 'clock' | 'fraction' | 'fractionText' | 'geometry';
 
 export interface GridLayoutInput {
   problemCount: number;
@@ -210,6 +232,9 @@ export interface GridLayout {
   /** Bara satt när layout är 'fraction' — figurens sida (cirkelns diameter,
    * stapelns bredd), se drawFractionProblem i render.ts. */
   fractionSizeMm?: number;
+  /** Bara satt när layout är 'geometry' — sidan på den ruta figuren och dess
+   * måttetiketter ritas inom, se drawGeometryProblem i render.ts. */
+  geometryFigureSizeMm?: number;
 }
 
 export function computeGridLayout(input: GridLayoutInput): GridLayout {
@@ -230,8 +255,17 @@ export function computeGridLayout(input: GridLayoutInput): GridLayout {
     FRACTION_SHAPE_MIN_MM,
     FRACTION_SHAPE_MAX_MM,
   );
+  const targetGeometryFigureSizeMm = clamp(
+    fontSizeMm * GEOMETRY_FIGURE_FONT_FACTOR,
+    GEOMETRY_FIGURE_MIN_MM,
+    GEOMETRY_FIGURE_MAX_MM,
+  );
   const targetVisualSizeMm =
-    layoutMode === 'fraction' ? targetFractionSizeMm : targetClockDiameterMm;
+    layoutMode === 'fraction'
+      ? targetFractionSizeMm
+      : layoutMode === 'geometry'
+        ? targetGeometryFigureSizeMm
+        : targetClockDiameterMm;
 
   const columns = resolveColumns(
     input.columns,
@@ -261,6 +295,14 @@ export function computeGridLayout(input: GridLayoutInput): GridLayout {
           FRACTION_SHAPE_MAX_MM,
         )
       : undefined;
+  const geometryFigureSizeMm =
+    layoutMode === 'geometry'
+      ? clamp(
+          Math.min(targetGeometryFigureSizeMm, columnWidthMm - GEOMETRY_COLUMN_GUTTER_MM),
+          GEOMETRY_FIGURE_MIN_MM,
+          GEOMETRY_FIGURE_MAX_MM,
+        )
+      : undefined;
 
   const rowHeightMm =
     layoutMode === 'vertical'
@@ -288,7 +330,15 @@ export function computeGridLayout(input: GridLayoutInput): GridLayout {
               fractionStackReachAboveMm(fontSizeMm) +
               FRACTION_LABEL_DESCENDER_MM +
               FRACTION_ROW_EXTRA_GAP_MM
-            : Math.max(fontSizeMm * LINE_HEIGHT_FACTOR, MIN_ROW_HEIGHT_MM);
+            : layoutMode === 'geometry'
+              ? // Samma uppbyggnad som klockläget: figurruta + luft + en
+                // textrad (svarsraden) + nedstick + luft till nästa rad.
+                geometryFigureSizeMm! +
+                GEOMETRY_FIGURE_LABEL_GAP_MM +
+                fontSizeMm +
+                GEOMETRY_LABEL_DESCENDER_MM +
+                GEOMETRY_ROW_EXTRA_GAP_MM
+              : Math.max(fontSizeMm * LINE_HEIGHT_FACTOR, MIN_ROW_HEIGHT_MM);
   const rowsPerPage = Math.max(1, Math.floor(availableHeightMm / rowHeightMm));
 
   const problemsPerPage = columns * rowsPerPage;
@@ -319,6 +369,7 @@ export function computeGridLayout(input: GridLayoutInput): GridLayout {
     positions,
     clockDiameterMm,
     fractionSizeMm,
+    geometryFigureSizeMm,
   };
 }
 
@@ -330,8 +381,13 @@ function resolveColumns(
   targetVisualSizeMm: number,
 ): number {
   if (columns === 'auto') {
-    if (layoutMode === 'clock' || layoutMode === 'fraction') {
-      const gutterMm = layoutMode === 'clock' ? CLOCK_COLUMN_GUTTER_MM : FRACTION_COLUMN_GUTTER_MM;
+    if (layoutMode === 'clock' || layoutMode === 'fraction' || layoutMode === 'geometry') {
+      const gutterMm =
+        layoutMode === 'clock'
+          ? CLOCK_COLUMN_GUTTER_MM
+          : layoutMode === 'fraction'
+            ? FRACTION_COLUMN_GUTTER_MM
+            : GEOMETRY_COLUMN_GUTTER_MM;
       const estimatedCellWidthMm = targetVisualSizeMm + gutterMm;
       return Math.max(1, Math.floor(availableWidthMm / estimatedCellWidthMm));
     }

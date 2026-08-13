@@ -3,8 +3,19 @@ import type { jsPDF } from 'jspdf';
 import { generateClockProblems } from './core/clock';
 import { generateFractionProblems } from './core/fractions';
 import { generateProblems } from './core/generate';
-import { validateClockConfig, validateConfig, validateFractionConfig } from './core/validate';
-import { renderClockSheetToPdf, renderFractionSheetToPdf, renderProblemsToPdf } from './pdf/render';
+import { generateGeometryProblems } from './core/geometry';
+import {
+  validateClockConfig,
+  validateConfig,
+  validateFractionConfig,
+  validateGeometryConfig,
+} from './core/validate';
+import {
+  renderClockSheetToPdf,
+  renderFractionSheetToPdf,
+  renderGeometrySheetToPdf,
+  renderProblemsToPdf,
+} from './pdf/render';
 import { decodeState, encodeState } from './state/urlState';
 import { loadState, saveState } from './state/storage';
 import { mountForm } from './ui/form';
@@ -80,6 +91,15 @@ function regenerate(state: AppState): void {
     return;
   }
 
+  if (state.sheetType === 'geometry') {
+    const { config, warnings } = validateGeometryConfig(state.geometry);
+    renderWarnings(warnings);
+    preview.update(() =>
+      renderGeometrySheetToPdf(generateGeometryProblems(config), toDocumentConfig(state), config),
+    );
+    return;
+  }
+
   const { config, warnings } = validateConfig(state.generator);
   renderWarnings(warnings);
   preview.update(() => renderProblemsToPdf(generateProblems(config), toDocumentConfig(state)));
@@ -108,6 +128,14 @@ function buildCurrentPdf(): jsPDF {
     const { config } = validateFractionConfig(state.fraction);
     return renderFractionSheetToPdf(
       generateFractionProblems(config),
+      toDocumentConfig(state),
+      config,
+    );
+  }
+  if (state.sheetType === 'geometry') {
+    const { config } = validateGeometryConfig(state.geometry);
+    return renderGeometrySheetToPdf(
+      generateGeometryProblems(config),
       toDocumentConfig(state),
       config,
     );

@@ -6,6 +6,8 @@ import type {
   FractionDirectionMode,
   FractionGeneratorConfig,
   GeneratorConfig,
+  GeometryGeneratorConfig,
+  GeometryMeasureMode,
   OperationConfig,
   SheetType,
 } from '../types';
@@ -27,6 +29,7 @@ export interface AppState {
   generator: GeneratorConfig;
   clock: ClockGeneratorConfig;
   fraction: FractionGeneratorConfig;
+  geometry: GeometryGeneratorConfig;
   document: Omit<DocumentConfig, 'seed'>;
 }
 
@@ -36,7 +39,9 @@ export function toDocumentConfig(state: AppState): DocumentConfig {
       ? state.clock.seed
       : state.sheetType === 'fraction'
         ? state.fraction.seed
-        : state.generator.seed;
+        : state.sheetType === 'geometry'
+          ? state.geometry.seed
+          : state.generator.seed;
   return { ...state.document, seed };
 }
 
@@ -66,6 +71,7 @@ export function createDefaultState(): AppState {
     },
     clock: createDefaultClockConfig(),
     fraction: createDefaultFractionConfig(),
+    geometry: createDefaultGeometryConfig(),
     document: {
       header: { title: 'Matteuppgifter', showName: true, showDate: true, instructions: '' },
       fontSizePt: 14,
@@ -86,6 +92,16 @@ const CLOCK_INSTRUCTIONS: Record<ClockDirectionMode, string> = {
   draw: 'Rita visarna.',
   digital: 'Läs av klockan och skriv tiden digitalt.',
   digitalDraw: 'Rita visarna.',
+  mixed: '',
+};
+
+/** Instruktionstext per efterfrågat geometrimått — se
+ * DocumentHeader.instructions. 'mixed' lämnas tom eftersom varje uppgift
+ * själv skriver ut "Area ="/"Omkrets =": en gemensam instruktion skulle då
+ * bli direkt missvisande, inte bara intetsägande. */
+const GEOMETRY_INSTRUCTIONS: Record<GeometryMeasureMode, string> = {
+  area: 'Beräkna arean.',
+  perimeter: 'Beräkna omkretsen.',
   mixed: '',
 };
 
@@ -113,6 +129,8 @@ export function computeDefaultInstructions(state: AppState): string {
       return CLOCK_INSTRUCTIONS[state.clock.direction];
     case 'fraction':
       return FRACTION_INSTRUCTIONS[state.fraction.direction];
+    case 'geometry':
+      return GEOMETRY_INSTRUCTIONS[state.geometry.measure];
   }
 }
 
@@ -135,6 +153,21 @@ function createDefaultFractionConfig(): FractionGeneratorConfig {
     direction: 'identify',
     showPercent: false,
     count: 12,
+    avoidDuplicates: true,
+    seed: randomSeed(),
+  };
+}
+
+function createDefaultGeometryConfig(): GeometryGeneratorConfig {
+  return {
+    shape: 'rectangle',
+    measure: 'area',
+    // Små, hanterbara mått som standard: rektangelns sidor och triangelns
+    // bas/höjd blir tal man kan multiplicera i huvudet, och en radie på 2–10
+    // ger cirkelareor under 320 cm².
+    sideRange: { min: 2, max: 10 },
+    showUnits: true,
+    count: 9,
     avoidDuplicates: true,
     seed: randomSeed(),
   };

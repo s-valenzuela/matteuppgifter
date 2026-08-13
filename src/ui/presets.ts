@@ -125,6 +125,34 @@ export const PRESETS: Preset[] = [
       return state;
     },
   },
+  {
+    id: 'geometry-area',
+    label: 'Area rektangel',
+    build: () => {
+      const state = createDefaultState();
+      state.sheetType = 'geometry';
+      state.geometry.shape = 'rectangle';
+      state.geometry.measure = 'area';
+      state.document.answerStyle = 'line';
+      state.document.header.title = 'Area — rektangel';
+      state.document.header.instructions = computeDefaultInstructions(state);
+      return state;
+    },
+  },
+  {
+    id: 'geometry-perimeter-mixed',
+    label: 'Omkrets blandat',
+    build: () => {
+      const state = createDefaultState();
+      state.sheetType = 'geometry';
+      state.geometry.shape = 'mixed';
+      state.geometry.measure = 'perimeter';
+      state.document.answerStyle = 'line';
+      state.document.header.title = 'Omkrets — blandade figurer';
+      state.document.header.instructions = computeDefaultInstructions(state);
+      return state;
+    },
+  },
 ];
 
 /** Nivå-chips: sätter samma talområde på alla fyra räknesätt, oavsett om de är aktiverade. */

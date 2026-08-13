@@ -1,5 +1,5 @@
 import type { jsPDF } from 'jspdf';
-import { pointAt } from './geometry';
+import { pointAt } from './trig';
 import { MM_PER_PT } from './layout';
 
 /** Var på radien (0–1) timmarkeringarnas inre kant börjar. */

@@ -1,6 +1,6 @@
 import type { jsPDF } from 'jspdf';
 import type { FractionShape } from '../types';
-import { pointAt } from './geometry';
+import { pointAt } from './trig';
 
 /** Fyllningsgrå för färglagda sektorer/fält — ljus nog att skrivas ut utan
  * att dränka gränslinjerna, mörk nog att tydligt läsas som "färglagt". */

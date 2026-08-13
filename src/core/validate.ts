@@ -1,10 +1,12 @@
 import { clockPoolSize } from './clock';
 import { fractionPoolSize, FRACTION_DENOMINATORS } from './fractions';
+import { geometryPoolSize } from './geometry';
 import type {
   ClockGeneratorConfig,
   ClockStep,
   FractionGeneratorConfig,
   GeneratorConfig,
+  GeometryGeneratorConfig,
   Operation,
   OperationConfig,
   Range,
@@ -22,6 +24,11 @@ export interface ClockValidationResult {
 
 export interface FractionValidationResult {
   config: FractionGeneratorConfig;
+  warnings: string[];
+}
+
+export interface GeometryValidationResult {
+  config: GeometryGeneratorConfig;
   warnings: string[];
 }
 
@@ -132,6 +139,37 @@ export function validateFractionConfig(input: FractionGeneratorConfig): Fraction
   }
 
   return { config: { ...input, denominators, count }, warnings };
+}
+
+/** Motsvarigheten till validateFractionConfig för geometriblad — se
+ * kommentaren där. Måtten måste vara positiva heltal: en sida på 0 cm ger en
+ * figur utan utsträckning, och negativa mått är inte meningsfulla alls. */
+export function validateGeometryConfig(input: GeometryGeneratorConfig): GeometryValidationResult {
+  const warnings: string[] = [];
+  const count = normalizeCount(input.count);
+  if (count !== input.count) {
+    warnings.push('Antalet uppgifter justerades till ett positivt heltal.');
+  }
+
+  const normalized = normalizeRange(input.sideRange);
+  const sideRange: Range = { min: Math.max(1, normalized.min), max: Math.max(1, normalized.max) };
+  if (sideRange.min !== input.sideRange.min || sideRange.max !== input.sideRange.max) {
+    warnings.push('Måtten justerades till positiva heltal (minst 1 cm).');
+  }
+
+  const config: GeometryGeneratorConfig = { ...input, sideRange, count };
+
+  if (input.avoidDuplicates && count > 0) {
+    const poolSize = geometryPoolSize(config);
+    if (poolSize < count) {
+      warnings.push(
+        `De valda inställningarna rymmer bara ca ${poolSize} unika uppgifter, men ${count} ` +
+          'efterfrågas — uppgifter kommer att upprepas.',
+      );
+    }
+  }
+
+  return { config, warnings };
 }
 
 function normalizeOperationConfig(config: OperationConfig): OperationConfig {

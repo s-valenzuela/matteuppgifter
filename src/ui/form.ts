@@ -6,6 +6,8 @@ import type {
   DocumentLayout,
   FractionDirectionMode,
   FractionShapeMode,
+  GeometryMeasureMode,
+  GeometryShapeMode,
   Operation,
   SheetType,
 } from '../types';
@@ -52,6 +54,19 @@ const FRACTION_DIRECTION_LABELS: Record<FractionDirectionMode, string> = {
   mixed: 'Blandat',
 };
 
+const GEOMETRY_SHAPE_LABELS: Record<GeometryShapeMode, string> = {
+  rectangle: 'Rektangel',
+  triangle: 'Triangel',
+  circle: 'Cirkel',
+  mixed: 'Blandat',
+};
+
+const GEOMETRY_MEASURE_LABELS: Record<GeometryMeasureMode, string> = {
+  area: 'Area',
+  perimeter: 'Omkrets',
+  mixed: 'Blandat',
+};
+
 // Feather-ikon (MIT), inbäddad som inline-SVG istället för en extern ikonfil
 // eftersom appen inte har några andra tillgångar att ladda in.
 const EDIT_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true" focusable="false"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>`;
@@ -84,6 +99,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const shuffleField = q<HTMLElement>(container, '#shuffle-field');
   const clockSection = q<HTMLElement>(container, '#clock-section');
   const fractionSection = q<HTMLElement>(container, '#fraction-section');
+  const geometrySection = q<HTMLElement>(container, '#geometry-section');
 
   const operationEls = new Map(
     OPERATION_KEYS.map((key) => [
@@ -117,6 +133,12 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const fractionDirectionEl = q<HTMLSelectElement>(container, '#fraction-direction');
   const fractionShowPercentField = q<HTMLElement>(container, '#fraction-showPercent-field');
   const fractionShowPercentEl = q<HTMLInputElement>(container, '#fraction-showPercent');
+
+  const geometryShapeEl = q<HTMLSelectElement>(container, '#geometry-shape');
+  const geometryMeasureEl = q<HTMLSelectElement>(container, '#geometry-measure');
+  const geometryMinEl = q<HTMLInputElement>(container, '#geometry-min');
+  const geometryMaxEl = q<HTMLInputElement>(container, '#geometry-max');
+  const geometryShowUnitsEl = q<HTMLInputElement>(container, '#geometry-showUnits');
 
   const countEl = q<HTMLInputElement>(container, '#count');
   const avoidDuplicatesEl = q<HTMLInputElement>(container, '#avoidDuplicates');
@@ -152,6 +174,10 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     return state.sheetType === 'fraction';
   }
 
+  function isGeometry(): boolean {
+    return state.sheetType === 'geometry';
+  }
+
   function isArithmetic(): boolean {
     return state.sheetType === 'arithmetic';
   }
@@ -164,6 +190,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   function activeCountable(): { count: number; avoidDuplicates: boolean; seed: number } {
     if (isClock()) return state.clock;
     if (isFraction()) return state.fraction;
+    if (isGeometry()) return state.geometry;
     return state.generator;
   }
 
@@ -177,6 +204,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     shuffleField.hidden = !isArithmetic();
     clockSection.hidden = !isClock();
     fractionSection.hidden = !isFraction();
+    geometrySection.hidden = !isGeometry();
 
     for (const key of OPERATION_KEYS) {
       const cfg = state.generator.operations[key];
@@ -211,6 +239,12 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     fractionShapeField.hidden = state.fraction.direction === 'toPercent';
     fractionShowPercentField.hidden =
       state.fraction.direction === 'toPercent' || state.fraction.direction === 'identifyPercent';
+
+    geometryShapeEl.value = state.geometry.shape;
+    geometryMeasureEl.value = state.geometry.measure;
+    geometryMinEl.value = String(state.geometry.sideRange.min);
+    geometryMaxEl.value = String(state.geometry.sideRange.max);
+    geometryShowUnitsEl.checked = state.geometry.showUnits;
 
     const countable = activeCountable();
     countEl.value = String(countable.count);
@@ -264,6 +298,13 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
           // ett eget val av svarsstil inte skrivs över i onödan.
           if (state.sheetType === 'fraction' && previousType !== 'fraction') {
             state.document.answerStyle = 'box';
+          }
+          // Geometrisvar kan vara flersiffriga och till och med ha decimaler
+          // ("~28,3"), vilket inte får plats i bråkens lilla ruta — en linje
+          // ger eleven en rimlig yta att skriva på. Samma "sätts bara vid en
+          // faktisk växling"-princip som bråkets ruta ovan.
+          if (state.sheetType === 'geometry' && previousType !== 'geometry') {
+            state.document.answerStyle = 'line';
           }
         });
         refreshFromState();
@@ -401,6 +442,38 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     emitChange();
   });
 
+  geometryShapeEl.addEventListener('change', () => {
+    state.geometry.shape = geometryShapeEl.value as GeometryShapeMode;
+    emitChange();
+  });
+  geometryMeasureEl.addEventListener('change', () => {
+    updateInstructionsIfDefault(() => {
+      state.geometry.measure = geometryMeasureEl.value as GeometryMeasureMode;
+    });
+    // refreshFromState (inte bara emitChange) eftersom instruktionsfältet kan
+    // ha uppdaterats till ett nytt standardvärde, se updateInstructionsIfDefault.
+    refreshFromState();
+    emitChange();
+  });
+  geometryMinEl.addEventListener('input', () => {
+    const value = Number(geometryMinEl.value);
+    if (Number.isFinite(value)) {
+      state.geometry.sideRange.min = value;
+      emitChange();
+    }
+  });
+  geometryMaxEl.addEventListener('input', () => {
+    const value = Number(geometryMaxEl.value);
+    if (Number.isFinite(value)) {
+      state.geometry.sideRange.max = value;
+      emitChange();
+    }
+  });
+  geometryShowUnitsEl.addEventListener('change', () => {
+    state.geometry.showUnits = geometryShowUnitsEl.checked;
+    emitChange();
+  });
+
   // "Antal uppgifter"/"Undvik dubbletter" är samma synliga fält för alla tre
   // bladtyper (se activeCountable ovan).
   countEl.addEventListener('input', () => {
@@ -517,6 +590,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
       state.generator.seed = seed;
       state.clock.seed = seed;
       state.fraction.seed = seed;
+      state.geometry.seed = seed;
       refreshFromState();
       emitChange();
     },
@@ -583,6 +657,17 @@ function renderTemplate(): string {
     .map(([value, label]) => `<option value="${value}">${label}</option>`)
     .join('');
 
+  const geometryShapeOptions = (
+    Object.entries(GEOMETRY_SHAPE_LABELS) as [GeometryShapeMode, string][]
+  )
+    .map(([value, label]) => `<option value="${value}">${label}</option>`)
+    .join('');
+  const geometryMeasureOptions = (
+    Object.entries(GEOMETRY_MEASURE_LABELS) as [GeometryMeasureMode, string][]
+  )
+    .map(([value, label]) => `<option value="${value}">${label}</option>`)
+    .join('');
+
   return `
     <section aria-labelledby="sheettype-heading">
       <h2 id="sheettype-heading">Typ av blad</h2>
@@ -590,6 +675,7 @@ function renderTemplate(): string {
         <label><input type="radio" name="sheetType" value="arithmetic" /> Räknesätt</label>
         <label><input type="radio" name="sheetType" value="clock" /> Klockan</label>
         <label><input type="radio" name="sheetType" value="fraction" /> Bråk</label>
+        <label><input type="radio" name="sheetType" value="geometry" /> Geometri</label>
       </div>
     </section>
 
@@ -652,6 +738,23 @@ function renderTemplate(): string {
       <label id="fraction-showPercent-field">
         <input type="checkbox" id="fraction-showPercent" /> Visa procent (t.ex. "= 75 %")
       </label>
+    </section>
+
+    <section aria-labelledby="geometry-heading" id="geometry-section">
+      <h2 id="geometry-heading">Geometri</h2>
+      <div class="field-grid">
+        <label>Figur
+          <select id="geometry-shape">${geometryShapeOptions}</select>
+        </label>
+        <label>Räkna ut
+          <select id="geometry-measure">${geometryMeasureOptions}</select>
+        </label>
+      </div>
+      <div class="op-range">
+        <label>Mått från <input type="number" id="geometry-min" min="1" step="1" /></label>
+        <label>Till <input type="number" id="geometry-max" min="1" step="1" /></label>
+      </div>
+      <label><input type="checkbox" id="geometry-showUnits" /> Visa enheter (cm och cm²)</label>
     </section>
 
     <section aria-labelledby="sheet-heading">

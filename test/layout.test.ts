@@ -280,6 +280,71 @@ describe('computeGridLayout', () => {
     });
   });
 
+  describe('geometriläge (layout: "geometry")', () => {
+    it('sätter en positiv geometryFigureSizeMm, bara för geometriläget', () => {
+      const geometry = computeGridLayout({
+        problemCount: 10,
+        fontSizePt: 14,
+        columns: 3,
+        layout: 'geometry',
+      });
+      expect(geometry.geometryFigureSizeMm).toBeGreaterThan(0);
+
+      const grid = computeGridLayout({
+        problemCount: 10,
+        fontSizePt: 14,
+        columns: 3,
+        layout: 'grid',
+      });
+      expect(grid.geometryFigureSizeMm).toBeUndefined();
+    });
+
+    it('placerar aldrig innehåll utanför marginalerna', () => {
+      for (const columns of ['auto', 1, 2, 4, 6] as const) {
+        for (const fontSizePt of [10, 14, 24]) {
+          const layout = computeGridLayout({
+            problemCount: 41,
+            fontSizePt,
+            columns,
+            layout: 'geometry',
+          });
+          for (const p of layout.positions) {
+            expect(p.xMm).toBeGreaterThanOrEqual(A4_METRICS.marginMm);
+            expect(p.xMm + layout.columnWidthMm).toBeLessThanOrEqual(
+              A4_METRICS.pageWidthMm - A4_METRICS.marginMm + 1e-9,
+            );
+            expect(p.yMm).toBeGreaterThanOrEqual(A4_METRICS.marginMm + A4_METRICS.headerHeightMm);
+            expect(p.yMm).toBeLessThanOrEqual(
+              A4_METRICS.pageHeightMm - A4_METRICS.marginMm - A4_METRICS.footerHeightMm + 1e-9,
+            );
+          }
+        }
+      }
+    });
+
+    it('figuren ryms aldrig bredare än sin egen kolumn, även med ett smalt manuellt kolumnantal', () => {
+      for (const columns of [1, 2, 3, 4, 5, 6]) {
+        const layout = computeGridLayout({
+          problemCount: 6,
+          fontSizePt: 14,
+          columns,
+          layout: 'geometry',
+        });
+        expect(layout.geometryFigureSizeMm!).toBeLessThanOrEqual(layout.columnWidthMm);
+      }
+    });
+
+    it('fördelar uppgifter över rätt antal sidor', () => {
+      const layout = computeGridLayout({
+        problemCount: 30,
+        fontSizePt: 14,
+        columns: 3,
+        layout: 'geometry',
+      });
+      expect(layout.pageCount).toBe(Math.ceil(30 / layout.problemsPerPage));
+    });
+  });
+
   describe('computeHeaderHeightMm', () => {
     it('ger tillbaka bashöjden oförändrad utan extra rader', () => {
       expect(computeHeaderHeightMm(A4_METRICS.headerHeightMm, 0)).toBe(A4_METRICS.headerHeightMm);

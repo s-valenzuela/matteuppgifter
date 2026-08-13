@@ -6,7 +6,7 @@ const STORAGE_KEY = 'matteuppgifter:state:v1';
 /** Nyckeln bumpas medvetet INTE när nya fält tillkommer — normalizeState
  * nedan fyller på det som saknas, så användarens sparade inställningar
  * överlever i stället för att kastas bort vid varje ny funktion. */
-const SHEET_TYPES: readonly SheetType[] = ['arithmetic', 'clock', 'fraction'];
+const SHEET_TYPES: readonly SheetType[] = ['arithmetic', 'clock', 'fraction', 'geometry'];
 
 /**
  * Läser senast sparade AppState från localStorage. Skyddad med try/catch
@@ -46,6 +46,7 @@ function normalizeState(state: AppState): AppState {
     generator: state.generator,
     clock: state.clock ?? fallback.clock,
     fraction: state.fraction ?? fallback.fraction,
+    geometry: state.geometry ?? fallback.geometry,
     document: {
       ...fallback.document,
       ...state.document,

@@ -90,8 +90,9 @@ export interface DocumentConfig {
   seed: number;
 }
 
-/** Vilken typ av blad som ska genereras — styr vilken av generator/clock/fraction som används. */
-export type SheetType = 'arithmetic' | 'clock' | 'fraction';
+/** Vilken typ av blad som ska genereras — styr vilken av
+ * generator/clock/fraction/geometry som används. */
+export type SheetType = 'arithmetic' | 'clock' | 'fraction' | 'geometry';
 
 /**
  * Ett kryssbart minutmärke för klockuppgifter — flera kan vara påslagna
@@ -181,6 +182,53 @@ export interface FractionGeneratorConfig {
   /** Totalt antal uppgifter att generera. */
   count: number;
   /** Undvik dubbletter (samma form, täljare och nämnare) så länge poolen räcker till. */
+  avoidDuplicates: boolean;
+  /** Visas i sidfoten — separat seed, se motsvarande kommentar på ClockGeneratorConfig. */
+  seed: number;
+}
+
+/** Geometrifigurerna eleven kan få räkna på. Se pdf/geometryFigure.ts. */
+export type GeometryShape = 'rectangle' | 'triangle' | 'circle';
+
+/** 'mixed' slumpar figur per uppgift, se core/geometry.ts. */
+export type GeometryShapeMode = GeometryShape | 'mixed';
+
+/** Vad som ska räknas ut: arean eller omkretsen. */
+export type GeometryMeasure = 'area' | 'perimeter';
+
+/** 'mixed' slumpar per uppgift — varje uppgift skriver ändå ut sitt eget
+ * "Area ="/"Omkrets =", så eleven ser alltid vad som efterfrågas. */
+export type GeometryMeasureMode = GeometryMeasure | 'mixed';
+
+/**
+ * En geometriuppgift. Medvetet en union och inte ett platt objekt med
+ * valfria fält: vilka mått som behövs beror på BÅDE figur och efterfrågat
+ * mått, och unionen gör de omöjliga kombinationerna orepresenterbara.
+ *
+ * Framför allt triangeln: arean kräver bas och höjd, medan omkretsen kräver
+ * alla tre sidorna (de går inte att räkna ut ur bas+höjd). Omkretstrianglar
+ * byggs därför av pythagoreiska tripplar — rätvinkliga med heltalssidor — så
+ * att a+b+c alltid går jämnt ut, se PYTHAGOREAN_TRIPLES i core/geometry.ts.
+ * Areatrianglar har ingen sådan begränsning och slumpas fritt (med bas×höjd
+ * jämnt, så att bas×höjd/2 blir ett heltal), vilket ger en mycket större pool.
+ */
+export type GeometryProblem =
+  | { shape: 'rectangle'; measure: GeometryMeasure; widthCm: number; heightCm: number }
+  | { shape: 'circle'; measure: GeometryMeasure; radiusCm: number }
+  | { shape: 'triangle'; measure: 'area'; baseCm: number; heightCm: number }
+  | { shape: 'triangle'; measure: 'perimeter'; sidesCm: [number, number, number] };
+
+export interface GeometryGeneratorConfig {
+  shape: GeometryShapeMode;
+  measure: GeometryMeasureMode;
+  /** Talområde för figurernas mått i cm (rektangelns sidor, triangelns bas
+   * och höjd, cirkelns radie). */
+  sideRange: Range;
+  /** Skriv ut enheter: "6 cm" på figuren och "cm²"/"cm" efter svaret. */
+  showUnits: boolean;
+  /** Totalt antal uppgifter att generera. */
+  count: number;
+  /** Undvik dubbletter (samma figur, mått och efterfrågat mått) så länge poolen räcker till. */
   avoidDuplicates: boolean;
   /** Visas i sidfoten — separat seed, se motsvarande kommentar på ClockGeneratorConfig. */
   seed: number;
