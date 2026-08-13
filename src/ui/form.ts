@@ -47,6 +47,8 @@ const FRACTION_SHAPE_LABELS: Record<FractionShapeMode, string> = {
 const FRACTION_DIRECTION_LABELS: Record<FractionDirectionMode, string> = {
   identify: 'Läs av figuren (skriv bråket)',
   shade: 'Färglägg figuren (givet bråk)',
+  identifyPercent: 'Läs av figuren (skriv procent)',
+  toPercent: 'Bråk till procent (utan figur, för äldre elever)',
   mixed: 'Blandat',
 };
 
@@ -110,8 +112,10 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const fractionDenominatorEls = new Map(
     FRACTION_DENOMINATORS.map((d) => [d, q<HTMLInputElement>(container, `#fraction-denom-${d}`)]),
   );
+  const fractionShapeField = q<HTMLElement>(container, '#fraction-shape-field');
   const fractionShapeEl = q<HTMLSelectElement>(container, '#fraction-shape');
   const fractionDirectionEl = q<HTMLSelectElement>(container, '#fraction-direction');
+  const fractionShowPercentField = q<HTMLElement>(container, '#fraction-showPercent-field');
   const fractionShowPercentEl = q<HTMLInputElement>(container, '#fraction-showPercent');
 
   const countEl = q<HTMLInputElement>(container, '#count');
@@ -199,6 +203,12 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     fractionShapeEl.value = state.fraction.shape;
     fractionDirectionEl.value = state.fraction.direction;
     fractionShowPercentEl.checked = state.fraction.showPercent;
+    // "Form" är meningslös utan figur, och "Visa procent" är meningslös när
+    // procent redan ÄR svaret (identifyPercent/toPercent) — se
+    // FRACTION_DIRECTION_LABELS och drawFractionProblem i pdf/render.ts.
+    fractionShapeField.hidden = state.fraction.direction === 'toPercent';
+    fractionShowPercentField.hidden =
+      state.fraction.direction === 'toPercent' || state.fraction.direction === 'identifyPercent';
 
     const countable = activeCountable();
     countEl.value = String(countable.count);
@@ -348,6 +358,9 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   });
   fractionDirectionEl.addEventListener('change', () => {
     state.fraction.direction = fractionDirectionEl.value as FractionDirectionMode;
+    // refreshFromState (inte bara emitChange) eftersom den även visar/döljer
+    // "Form" och "Visa procent" beroende på den nya riktningen.
+    refreshFromState();
     emitChange();
   });
   fractionShowPercentEl.addEventListener('change', () => {
@@ -582,14 +595,14 @@ function renderTemplate(): string {
         ${fractionDenominatorCheckboxes}
       </div>
       <div class="field-grid">
-        <label>Form
+        <label id="fraction-shape-field">Form
           <select id="fraction-shape">${fractionShapeOptions}</select>
         </label>
         <label>Riktning
           <select id="fraction-direction">${fractionDirectionOptions}</select>
         </label>
       </div>
-      <label>
+      <label id="fraction-showPercent-field">
         <input type="checkbox" id="fraction-showPercent" /> Visa procent (t.ex. "= 75 %")
       </label>
     </section>

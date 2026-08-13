@@ -126,10 +126,19 @@ export type FractionShape = 'circle' | 'bar';
 /** 'mixed' slumpar form per uppgift, se core/fractions.ts. */
 export type FractionShapeMode = FractionShape | 'mixed';
 
-/** 'identify' — figuren är redan färglagd, eleven läser av och skriver
+/**
+ * 'identify' — figuren är redan färglagd, eleven läser av och skriver
  * bråket. 'shade' — bråket ges som text, eleven färglägger figuren själv
- * (facit visar den rätt färglagd). */
-export type FractionDirection = 'identify' | 'shade';
+ * (facit visar den rätt färglagd). 'identifyPercent' — som 'identify', men
+ * eleven skriver bråkets andel i procent i stället för som bråk (t.ex. en
+ * halvfärgad cirkel → "50 %"). 'toPercent' — helt utan figur: bråket ges som
+ * text och eleven räknar om det till procent, för äldre elever som inte
+ * längre behöver den visuella crutchen. 'mixed' slumpar bara mellan de tre
+ * figurbaserade riktningarna (inte 'toPercent', som saknar figur och därför
+ * har en annan sidlayout, se pdf/layout.ts:s 'fractionText'-läge och
+ * resolveDirection i core/fractions.ts).
+ */
+export type FractionDirection = 'identify' | 'shade' | 'identifyPercent' | 'toPercent';
 
 /** 'mixed' slumpar riktning per uppgift, se core/fractions.ts. */
 export type FractionDirectionMode = FractionDirection | 'mixed';

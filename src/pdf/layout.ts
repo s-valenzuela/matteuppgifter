@@ -134,8 +134,30 @@ export const FRACTION_BLANK_STACK_GAP_MM = 10;
  * render.ts) för att undvika ett cirkulärt beroende; ändras BOX_SIZE_MM i
  * render.ts måste den här uppdateras manuellt. */
 const FRACTION_BLANK_BOX_REACH_ABOVE_MM = 5;
+/**
+ * Uppskattat antal tecken i den längsta rimliga raden i 'fractionText'-läget
+ * (utan figur), t.ex. "12/12 = 100 %" — se ESTIMATED_CHARS_PER_PROBLEM för
+ * samma princip i det vågräta räknesättsläget.
+ */
+const ESTIMATED_CHARS_PER_PROBLEM_FRACTION_TEXT = 13;
 
-export type DocumentLayoutMode = 'grid' | 'vertical' | 'clock' | 'fraction';
+/**
+ * Hur långt en obesvarad ELLER besvarad bråkuppgifts täljar/streck/nämnare
+ * -stapel sträcker sig OVANFÖR nämnarens baslinje — den textskalade
+ * varianten (siffror, se drawStackedFractionText i render.ts) ELLER den
+ * fasta rute-varianten (svarsstil 'box', se drawStackedFractionBlank),
+ * vilken som vinner beror på teckenstorleken. Delad mellan 'fraction'- och
+ * 'fractionText'-lägets radhöjd nedan OCH render.ts:s figurplacering, så att
+ * de aldrig kan glida isär (samma klass av bugg som tidigare hittades här).
+ */
+export function fractionStackReachAboveMm(fontSizeMm: number): number {
+  return Math.max(
+    fontSizeMm * (1 + VERTICAL_LINE_STEP_FACTOR),
+    FRACTION_BLANK_STACK_GAP_MM + FRACTION_BLANK_BOX_REACH_ABOVE_MM,
+  );
+}
+
+export type DocumentLayoutMode = 'grid' | 'vertical' | 'clock' | 'fraction' | 'fractionText';
 
 export interface GridLayoutInput {
   problemCount: number;
@@ -237,19 +259,18 @@ export function computeGridLayout(input: GridLayoutInput): GridLayout {
         : layoutMode === 'fraction'
           ? fractionSizeMm! +
             FRACTION_SHAPE_LABEL_GAP_MM +
-            // Räcker för det som sträcker sig längst ovanför nämnarens
-            // baslinje — den textskalade varianten (facit/"shade": siffror,
-            // se drawStackedFractionText) ELLER den fasta rute-varianten
-            // (obesvarat "identify", svarsstil 'box', se
-            // drawStackedFractionBlank) — vilken som vinner beror på
-            // teckenstorleken.
-            Math.max(
-              fontSizeMm * (1 + VERTICAL_LINE_STEP_FACTOR),
-              FRACTION_BLANK_STACK_GAP_MM + FRACTION_BLANK_BOX_REACH_ABOVE_MM,
-            ) +
+            fractionStackReachAboveMm(fontSizeMm) +
             FRACTION_LABEL_DESCENDER_MM +
             FRACTION_ROW_EXTRA_GAP_MM
-          : Math.max(fontSizeMm * LINE_HEIGHT_FACTOR, MIN_ROW_HEIGHT_MM);
+          : layoutMode === 'fractionText'
+            ? // Samma stapelhöjd som 'fraction', men UTAN figur (och därmed
+              // utan FRACTION_SHAPE_LABEL_GAP_MM) — se 'toPercent' i
+              // core/fractions.ts och drawFractionToPercentProblem i
+              // render.ts.
+              fractionStackReachAboveMm(fontSizeMm) +
+              FRACTION_LABEL_DESCENDER_MM +
+              FRACTION_ROW_EXTRA_GAP_MM
+            : Math.max(fontSizeMm * LINE_HEIGHT_FACTOR, MIN_ROW_HEIGHT_MM);
   const rowsPerPage = Math.max(1, Math.floor(availableHeightMm / rowHeightMm));
 
   const problemsPerPage = columns * rowsPerPage;
@@ -299,7 +320,9 @@ function resolveColumns(
     const estimatedChars =
       layoutMode === 'vertical'
         ? ESTIMATED_CHARS_PER_PROBLEM_VERTICAL
-        : ESTIMATED_CHARS_PER_PROBLEM;
+        : layoutMode === 'fractionText'
+          ? ESTIMATED_CHARS_PER_PROBLEM_FRACTION_TEXT
+          : ESTIMATED_CHARS_PER_PROBLEM;
     const estimatedCellWidthMm =
       fontSizeMm * AVG_CHAR_WIDTH_FACTOR * estimatedChars + COLUMN_GUTTER_MM;
     return Math.max(1, Math.floor(availableWidthMm / estimatedCellWidthMm));

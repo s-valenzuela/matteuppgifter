@@ -212,4 +212,66 @@ describe('computeGridLayout', () => {
       expect(layout.pageCount).toBe(expectedPageCount);
     });
   });
+
+  describe('bråk-till-procent utan figur (layout: "fractionText")', () => {
+    it('sätter aldrig fractionSizeMm — det finns ingen figur att mäta upp', () => {
+      const layout = computeGridLayout({
+        problemCount: 10,
+        fontSizePt: 14,
+        columns: 3,
+        layout: 'fractionText',
+      });
+      expect(layout.fractionSizeMm).toBeUndefined();
+    });
+
+    it('reserverar mindre radhöjd än det figurbaserade bråkläget, för samma teckenstorlek', () => {
+      const withFigure = computeGridLayout({
+        problemCount: 1,
+        fontSizePt: 14,
+        columns: 3,
+        layout: 'fraction',
+      });
+      const withoutFigure = computeGridLayout({
+        problemCount: 1,
+        fontSizePt: 14,
+        columns: 3,
+        layout: 'fractionText',
+      });
+      expect(withoutFigure.rowHeightMm).toBeLessThan(withFigure.rowHeightMm);
+    });
+
+    it('placerar aldrig innehåll utanför marginalerna', () => {
+      for (const columns of ['auto', 1, 2, 4, 6] as const) {
+        for (const fontSizePt of [10, 14, 24]) {
+          const layout = computeGridLayout({
+            problemCount: 97,
+            fontSizePt,
+            columns,
+            layout: 'fractionText',
+          });
+          for (const p of layout.positions) {
+            expect(p.xMm).toBeGreaterThanOrEqual(A4_METRICS.marginMm);
+            expect(p.xMm + layout.columnWidthMm).toBeLessThanOrEqual(
+              A4_METRICS.pageWidthMm - A4_METRICS.marginMm + 1e-9,
+            );
+            expect(p.yMm).toBeGreaterThanOrEqual(A4_METRICS.marginMm + A4_METRICS.headerHeightMm);
+            expect(p.yMm).toBeLessThanOrEqual(
+              A4_METRICS.pageHeightMm - A4_METRICS.marginMm - A4_METRICS.footerHeightMm + 1e-9,
+            );
+          }
+        }
+      }
+    });
+
+    it('fördelar uppgifter över rätt antal sidor', () => {
+      const layout = computeGridLayout({
+        problemCount: 40,
+        fontSizePt: 14,
+        columns: 3,
+        layout: 'fractionText',
+      });
+      const expectedPageCount = Math.ceil(40 / layout.problemsPerPage);
+      expect(layout.pageCount).toBe(expectedPageCount);
+    });
+  });
 });

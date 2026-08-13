@@ -26,7 +26,13 @@ const CLOCK_DIRECTIONS: readonly ClockDirectionMode[] = [
   'mixed',
 ];
 const FRACTION_SHAPES: readonly FractionShapeMode[] = ['circle', 'bar', 'mixed'];
-const FRACTION_DIRECTIONS: readonly FractionDirectionMode[] = ['identify', 'shade', 'mixed'];
+const FRACTION_DIRECTIONS: readonly FractionDirectionMode[] = [
+  'identify',
+  'shade',
+  'identifyPercent',
+  'toPercent',
+  'mixed',
+];
 
 /**
  * Speglar AppState i en query-sträng så att ett blad kan delas eller
