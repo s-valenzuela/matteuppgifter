@@ -1,9 +1,10 @@
 import './style.css';
 import type { jsPDF } from 'jspdf';
 import { generateClockProblems } from './core/clock';
+import { generateFractionProblems } from './core/fractions';
 import { generateProblems } from './core/generate';
-import { validateClockConfig, validateConfig } from './core/validate';
-import { renderClockSheetToPdf, renderProblemsToPdf } from './pdf/render';
+import { validateClockConfig, validateConfig, validateFractionConfig } from './core/validate';
+import { renderClockSheetToPdf, renderFractionSheetToPdf, renderProblemsToPdf } from './pdf/render';
 import { decodeState, encodeState } from './state/urlState';
 import { loadState, saveState } from './state/storage';
 import { mountForm } from './ui/form';
@@ -70,6 +71,15 @@ function regenerate(state: AppState): void {
     return;
   }
 
+  if (state.sheetType === 'fraction') {
+    const { config, warnings } = validateFractionConfig(state.fraction);
+    renderWarnings(warnings);
+    preview.update(() =>
+      renderFractionSheetToPdf(generateFractionProblems(config), toDocumentConfig(state)),
+    );
+    return;
+  }
+
   const { config, warnings } = validateConfig(state.generator);
   renderWarnings(warnings);
   preview.update(() => renderProblemsToPdf(generateProblems(config), toDocumentConfig(state)));
@@ -93,6 +103,10 @@ function buildCurrentPdf(): jsPDF {
   if (state.sheetType === 'clock') {
     const { config } = validateClockConfig(state.clock);
     return renderClockSheetToPdf(generateClockProblems(config), toDocumentConfig(state), config);
+  }
+  if (state.sheetType === 'fraction') {
+    const { config } = validateFractionConfig(state.fraction);
+    return renderFractionSheetToPdf(generateFractionProblems(config), toDocumentConfig(state));
   }
   const { config } = validateConfig(state.generator);
   return renderProblemsToPdf(generateProblems(config), toDocumentConfig(state));

@@ -20,17 +20,22 @@ export function loadState(): AppState | null {
 }
 
 /**
- * Fyller på sheetType/clock för ett tillstånd sparat innan klockfunktionen
- * fanns — isAppState() nedan är en medvetet ytlig kontroll som INTE känner av
- * dessa fält, så ett äldre sparat tillstånd passar igenom den och skulle
- * annars komma tillbaka med sheetType/clock som undefined.
+ * Fyller på sheetType/clock/fraction för ett tillstånd sparat innan
+ * respektive bladtyp fanns — isAppState() nedan är en medvetet ytlig
+ * kontroll som INTE känner av dessa fält, så ett äldre sparat tillstånd
+ * passar igenom den och skulle annars komma tillbaka med clock/fraction som
+ * undefined.
  */
 function normalizeState(state: AppState): AppState {
   const fallback = createDefaultState();
   return {
-    sheetType: state.sheetType === 'clock' ? 'clock' : 'arithmetic',
+    sheetType:
+      state.sheetType === 'clock' || state.sheetType === 'fraction'
+        ? state.sheetType
+        : 'arithmetic',
     generator: state.generator,
     clock: state.clock ?? fallback.clock,
+    fraction: state.fraction ?? fallback.fraction,
     document: state.document,
   };
 }

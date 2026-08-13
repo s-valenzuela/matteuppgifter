@@ -1,8 +1,11 @@
+import { FRACTION_DENOMINATORS } from '../core/fractions';
 import type {
   AnswerStyle,
   ClockDirectionMode,
   ClockStep,
   DocumentLayout,
+  FractionDirectionMode,
+  FractionShapeMode,
   Operation,
   OperationConfig,
   Range,
@@ -13,7 +16,7 @@ import { createDefaultState, type AppState } from '../ui/state';
 const OPERATION_KEYS: readonly Operation[] = ['add', 'sub', 'mul', 'div'];
 const ANSWER_STYLES: readonly AnswerStyle[] = ['blank', 'line', 'box'];
 const DOCUMENT_LAYOUTS: readonly DocumentLayout[] = ['grid', 'vertical'];
-const SHEET_TYPES: readonly SheetType[] = ['arithmetic', 'clock'];
+const SHEET_TYPES: readonly SheetType[] = ['arithmetic', 'clock', 'fraction'];
 const CLOCK_STEPS: readonly ClockStep[] = ['hour', 'half', 'quarter', 'five'];
 const CLOCK_DIRECTIONS: readonly ClockDirectionMode[] = [
   'read',
@@ -22,6 +25,8 @@ const CLOCK_DIRECTIONS: readonly ClockDirectionMode[] = [
   'digitalDraw',
   'mixed',
 ];
+const FRACTION_SHAPES: readonly FractionShapeMode[] = ['circle', 'bar', 'mixed'];
+const FRACTION_DIRECTIONS: readonly FractionDirectionMode[] = ['identify', 'shade', 'mixed'];
 
 /**
  * Speglar AppState i en query-sträng så att ett blad kan delas eller
@@ -35,10 +40,10 @@ export function encodeState(state: AppState): URLSearchParams {
   const params = new URLSearchParams();
 
   // 'arithmetic' skrivs inte ut — det är standardvärdet och gör att äldre,
-  // redan delade länkar (från innan klockfunktionen fanns) fortsätter fungera
+  // redan delade länkar (från innan klockan/bråk fanns) fortsätter fungera
   // oförändrat, se decodeState.
-  if (state.sheetType === 'clock') {
-    params.set('type', 'clock');
+  if (state.sheetType !== 'arithmetic') {
+    params.set('type', state.sheetType);
   }
 
   for (const key of OPERATION_KEYS) {
@@ -73,6 +78,13 @@ export function encodeState(state: AppState): URLSearchParams {
   params.set('cn', String(state.clock.count));
   params.set('cdup', boolStr(state.clock.avoidDuplicates));
   params.set('cseed', String(state.clock.seed));
+
+  params.set('fdenom', state.fraction.denominators.join(','));
+  params.set('fshape', state.fraction.shape);
+  params.set('fdir', state.fraction.direction);
+  params.set('fn', String(state.fraction.count));
+  params.set('fdup', boolStr(state.fraction.avoidDuplicates));
+  params.set('fseed', String(state.fraction.seed));
 
   return params;
 }
@@ -122,6 +134,19 @@ export function decodeState(search: string): AppState | null {
   state.clock.avoidDuplicates = boolOr(params.get('cdup'), fallback.clock.avoidDuplicates);
   state.clock.seed = intOr(params.get('cseed'), fallback.clock.seed);
 
+  state.fraction.denominators = decodeFractionDenominators(
+    params.get('fdenom'),
+    fallback.fraction.denominators,
+  );
+  state.fraction.shape = decodeFractionShape(params.get('fshape'), fallback.fraction.shape);
+  state.fraction.direction = decodeFractionDirection(
+    params.get('fdir'),
+    fallback.fraction.direction,
+  );
+  state.fraction.count = intOr(params.get('fn'), fallback.fraction.count);
+  state.fraction.avoidDuplicates = boolOr(params.get('fdup'), fallback.fraction.avoidDuplicates);
+  state.fraction.seed = intOr(params.get('fseed'), fallback.fraction.seed);
+
   return state;
 }
 
@@ -149,6 +174,31 @@ function decodeClockDirection(
 ): ClockDirectionMode {
   return raw !== null && (CLOCK_DIRECTIONS as readonly string[]).includes(raw)
     ? (raw as ClockDirectionMode)
+    : fallback;
+}
+
+/** Kommaseparerad lista av ikryssade nämnare, samma princip som decodeClockSteps. */
+function decodeFractionDenominators(raw: string | null, fallback: number[]): number[] {
+  if (raw === null) return fallback;
+  const denominators = raw
+    .split(',')
+    .map((part) => Number(part))
+    .filter((n) => FRACTION_DENOMINATORS.includes(n));
+  return denominators.length > 0 ? denominators : fallback;
+}
+
+function decodeFractionShape(raw: string | null, fallback: FractionShapeMode): FractionShapeMode {
+  return raw !== null && (FRACTION_SHAPES as readonly string[]).includes(raw)
+    ? (raw as FractionShapeMode)
+    : fallback;
+}
+
+function decodeFractionDirection(
+  raw: string | null,
+  fallback: FractionDirectionMode,
+): FractionDirectionMode {
+  return raw !== null && (FRACTION_DIRECTIONS as readonly string[]).includes(raw)
+    ? (raw as FractionDirectionMode)
     : fallback;
 }
 

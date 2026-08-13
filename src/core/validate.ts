@@ -1,7 +1,9 @@
 import { clockPoolSize } from './clock';
+import { fractionPoolSize, FRACTION_DENOMINATORS } from './fractions';
 import type {
   ClockGeneratorConfig,
   ClockStep,
+  FractionGeneratorConfig,
   GeneratorConfig,
   Operation,
   OperationConfig,
@@ -15,6 +17,11 @@ export interface ValidationResult {
 
 export interface ClockValidationResult {
   config: ClockGeneratorConfig;
+  warnings: string[];
+}
+
+export interface FractionValidationResult {
+  config: FractionGeneratorConfig;
   warnings: string[];
 }
 
@@ -93,6 +100,38 @@ export function validateClockConfig(input: ClockGeneratorConfig): ClockValidatio
   }
 
   return { config: { ...input, steps, count }, warnings };
+}
+
+/** Motsvarigheten till validateClockConfig för bråkblad — samma idé, se
+ * kommentaren där. Faller tillbaka till hela FRACTION_DENOMINATORS-listan
+ * (i stället för en enda som klockans ['hour']) eftersom det ger en rimlig
+ * pool direkt utan att behöva gissa vilken enskild nämnare som är "standard". */
+export function validateFractionConfig(input: FractionGeneratorConfig): FractionValidationResult {
+  const warnings: string[] = [];
+  const count = normalizeCount(input.count);
+  if (count !== input.count) {
+    warnings.push('Antalet uppgifter justerades till ett positivt heltal.');
+  }
+
+  const denominators =
+    input.denominators.length > 0 ? input.denominators : [...FRACTION_DENOMINATORS];
+  if (denominators !== input.denominators) {
+    warnings.push(
+      'Minst en nämnare måste vara ikryssad — alla vanliga nämnare valdes automatiskt.',
+    );
+  }
+
+  if (input.avoidDuplicates && count > 0) {
+    const poolSize = fractionPoolSize(denominators, input.shape);
+    if (poolSize < count) {
+      warnings.push(
+        `De ikryssade nämnarna rymmer bara ${poolSize} unika bråk, men ${count} efterfrågas — ` +
+          'uppgifter kommer att upprepas.',
+      );
+    }
+  }
+
+  return { config: { ...input, denominators, count }, warnings };
 }
 
 function normalizeOperationConfig(config: OperationConfig): OperationConfig {

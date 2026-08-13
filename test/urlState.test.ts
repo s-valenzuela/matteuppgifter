@@ -33,6 +33,7 @@ describe('encodeState / decodeState', () => {
         seed: 987654,
       },
       clock: createDefaultState().clock,
+      fraction: createDefaultState().fraction,
       document: {
         header: { title: 'Läxa vecka 3', showName: false, showDate: true },
         fontSizePt: 20,
@@ -68,6 +69,7 @@ describe('encodeState / decodeState', () => {
         seed: 987654,
       },
       clock: createDefaultState().clock,
+      fraction: createDefaultState().fraction,
       document: {
         header: { title: 'Läxa vecka 3', showName: false, showDate: true },
         fontSizePt: 20,
@@ -195,6 +197,40 @@ describe('encodeState / decodeState', () => {
       const state = createDefaultState();
       state.sheetType = 'clock';
       state.clock.seed = 111;
+      state.generator.seed = 222;
+      expect(toDocumentConfig(state).seed).toBe(111);
+    });
+  });
+
+  describe('bråkblad', () => {
+    it('en avkodad standardkonfiguration för bråkblad återskapar exakt samma AppState', () => {
+      const state = createDefaultState();
+      state.sheetType = 'fraction';
+      const decoded = decodeState(`?${encodeState(state).toString()}`);
+      expect(decoded).toEqual(state);
+    });
+
+    it('kodar och avkodar alla bråkinställningar genom en tur-och-retur', () => {
+      const state = createDefaultState();
+      state.sheetType = 'fraction';
+      state.fraction = {
+        denominators: [5, 8],
+        shape: 'mixed',
+        direction: 'shade',
+        count: 24,
+        avoidDuplicates: false,
+        seed: 555,
+      };
+
+      const decoded = decodeState(`?${encodeState(state).toString()}`);
+      expect(decoded?.fraction).toEqual(state.fraction);
+      expect(decoded?.sheetType).toBe('fraction');
+    });
+
+    it('sätter footer-seeden från fraction.seed, inte generator.seed, när sheetType är "fraction"', () => {
+      const state = createDefaultState();
+      state.sheetType = 'fraction';
+      state.fraction.seed = 111;
       state.generator.seed = 222;
       expect(toDocumentConfig(state).seed).toBe(111);
     });

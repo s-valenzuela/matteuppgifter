@@ -1,6 +1,8 @@
+import { FRACTION_DENOMINATORS } from '../core/fractions';
 import type {
   ClockGeneratorConfig,
   DocumentConfig,
+  FractionGeneratorConfig,
   GeneratorConfig,
   OperationConfig,
   SheetType,
@@ -22,11 +24,17 @@ export interface AppState {
   sheetType: SheetType;
   generator: GeneratorConfig;
   clock: ClockGeneratorConfig;
+  fraction: FractionGeneratorConfig;
   document: Omit<DocumentConfig, 'seed'>;
 }
 
 export function toDocumentConfig(state: AppState): DocumentConfig {
-  const seed = state.sheetType === 'clock' ? state.clock.seed : state.generator.seed;
+  const seed =
+    state.sheetType === 'clock'
+      ? state.clock.seed
+      : state.sheetType === 'fraction'
+        ? state.fraction.seed
+        : state.generator.seed;
   return { ...state.document, seed };
 }
 
@@ -55,6 +63,7 @@ export function createDefaultState(): AppState {
       seed: randomSeed(),
     },
     clock: createDefaultClockConfig(),
+    fraction: createDefaultFractionConfig(),
     document: {
       header: { title: 'Matteuppgifter', showName: true, showDate: true },
       fontSizePt: 14,
@@ -72,6 +81,17 @@ function createDefaultClockConfig(): ClockGeneratorConfig {
     direction: 'read',
     showNumerals: true,
     showMinuteTicks: false,
+    count: 12,
+    avoidDuplicates: true,
+    seed: randomSeed(),
+  };
+}
+
+function createDefaultFractionConfig(): FractionGeneratorConfig {
+  return {
+    denominators: FRACTION_DENOMINATORS.filter((d) => d <= 4),
+    shape: 'circle',
+    direction: 'identify',
     count: 12,
     avoidDuplicates: true,
     seed: randomSeed(),

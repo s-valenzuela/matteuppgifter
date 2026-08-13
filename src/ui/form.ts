@@ -1,8 +1,11 @@
+import { FRACTION_DENOMINATORS } from '../core/fractions';
 import type {
   AnswerStyle,
   ClockDirectionMode,
   ClockStep,
   DocumentLayout,
+  FractionDirectionMode,
+  FractionShapeMode,
   Operation,
   SheetType,
 } from '../types';
@@ -32,6 +35,18 @@ const CLOCK_DIRECTION_LABELS: Record<ClockDirectionMode, string> = {
   draw: 'Rita visarna (given tid i ord)',
   digital: 'Läs av klockan (skriv tiden digitalt, t.ex. 06:30)',
   digitalDraw: 'Rita visarna (given tid digitalt, t.ex. 06:30)',
+  mixed: 'Blandat',
+};
+
+const FRACTION_SHAPE_LABELS: Record<FractionShapeMode, string> = {
+  circle: 'Cirkel (tårtbit)',
+  bar: 'Stapel',
+  mixed: 'Blandat',
+};
+
+const FRACTION_DIRECTION_LABELS: Record<FractionDirectionMode, string> = {
+  identify: 'Läs av figuren (skriv bråket)',
+  shade: 'Färglägg figuren (givet bråk)',
   mixed: 'Blandat',
 };
 
@@ -66,6 +81,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const missingNumberField = q<HTMLElement>(container, '#missingNumber-field');
   const shuffleField = q<HTMLElement>(container, '#shuffle-field');
   const clockSection = q<HTMLElement>(container, '#clock-section');
+  const fractionSection = q<HTMLElement>(container, '#fraction-section');
 
   const operationEls = new Map(
     OPERATION_KEYS.map((key) => [
@@ -90,6 +106,12 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const clockDirectionEl = q<HTMLSelectElement>(container, '#clock-direction');
   const clockShowNumeralsEl = q<HTMLInputElement>(container, '#clock-showNumerals');
   const clockShowMinuteTicksEl = q<HTMLInputElement>(container, '#clock-showMinuteTicks');
+
+  const fractionDenominatorEls = new Map(
+    FRACTION_DENOMINATORS.map((d) => [d, q<HTMLInputElement>(container, `#fraction-denom-${d}`)]),
+  );
+  const fractionShapeEl = q<HTMLSelectElement>(container, '#fraction-shape');
+  const fractionDirectionEl = q<HTMLSelectElement>(container, '#fraction-direction');
 
   const countEl = q<HTMLInputElement>(container, '#count');
   const avoidDuplicatesEl = q<HTMLInputElement>(container, '#avoidDuplicates');
@@ -119,15 +141,35 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     return state.sheetType === 'clock';
   }
 
+  function isFraction(): boolean {
+    return state.sheetType === 'fraction';
+  }
+
+  function isArithmetic(): boolean {
+    return state.sheetType === 'arithmetic';
+  }
+
+  /** "Antal uppgifter"/"Undvik dubbletter"/Seed är samma synliga fält för
+   * alla tre bladtyper (se AppState-kommentaren i ui/state.ts), men läser
+   * och skriver till generator/clock/fraction beroende på vilken typ som är
+   * aktiv just nu. Returnerar en referens till den riktiga delen av state,
+   * inte en kopia — att mutera .count etc. på returvärdet muterar state. */
+  function activeCountable(): { count: number; avoidDuplicates: boolean; seed: number } {
+    if (isClock()) return state.clock;
+    if (isFraction()) return state.fraction;
+    return state.generator;
+  }
+
   function refreshFromState(): void {
     for (const radio of sheetTypeRadios) {
       radio.checked = radio.value === state.sheetType;
     }
-    operationsSection.hidden = isClock();
-    layoutField.hidden = isClock();
-    missingNumberField.hidden = isClock();
-    shuffleField.hidden = isClock();
+    operationsSection.hidden = !isArithmetic();
+    layoutField.hidden = !isArithmetic();
+    missingNumberField.hidden = !isArithmetic();
+    shuffleField.hidden = !isArithmetic();
     clockSection.hidden = !isClock();
+    fractionSection.hidden = !isFraction();
 
     for (const key of OPERATION_KEYS) {
       const cfg = state.generator.operations[key];
@@ -150,13 +192,18 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     clockShowNumeralsEl.checked = state.clock.showNumerals;
     clockShowMinuteTicksEl.checked = state.clock.showMinuteTicks;
 
-    countEl.value = String(isClock() ? state.clock.count : state.generator.count);
-    avoidDuplicatesEl.checked = isClock()
-      ? state.clock.avoidDuplicates
-      : state.generator.avoidDuplicates;
+    for (const [d, el] of fractionDenominatorEls) {
+      el.checked = state.fraction.denominators.includes(d);
+    }
+    fractionShapeEl.value = state.fraction.shape;
+    fractionDirectionEl.value = state.fraction.direction;
+
+    const countable = activeCountable();
+    countEl.value = String(countable.count);
+    avoidDuplicatesEl.checked = countable.avoidDuplicates;
     shuffleEl.checked = state.generator.shuffle;
     missingNumberEl.checked = state.generator.missingNumber;
-    seedEl.value = String(isClock() ? state.clock.seed : state.generator.seed);
+    seedEl.value = String(countable.seed);
     seedEl.readOnly = true;
 
     columnsEl.value = String(state.document.columns);
@@ -276,26 +323,34 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     emitChange();
   });
 
-  // "Antal uppgifter"/"Undvik dubbletter" är samma synliga fält för båda
-  // bladtyperna (se AppState-kommentaren i ui/state.ts), men skriver till
-  // generator eller clock beroende på vilken typ som är aktiv just nu.
+  for (const [d, el] of fractionDenominatorEls) {
+    el.addEventListener('change', () => {
+      state.fraction.denominators = el.checked
+        ? [...state.fraction.denominators, d]
+        : state.fraction.denominators.filter((existing) => existing !== d);
+      emitChange();
+    });
+  }
+  fractionShapeEl.addEventListener('change', () => {
+    state.fraction.shape = fractionShapeEl.value as FractionShapeMode;
+    emitChange();
+  });
+  fractionDirectionEl.addEventListener('change', () => {
+    state.fraction.direction = fractionDirectionEl.value as FractionDirectionMode;
+    emitChange();
+  });
+
+  // "Antal uppgifter"/"Undvik dubbletter" är samma synliga fält för alla tre
+  // bladtyper (se activeCountable ovan).
   countEl.addEventListener('input', () => {
     const value = Number(countEl.value);
     if (Number.isFinite(value)) {
-      if (isClock()) {
-        state.clock.count = value;
-      } else {
-        state.generator.count = value;
-      }
+      activeCountable().count = value;
       emitChange();
     }
   });
   avoidDuplicatesEl.addEventListener('change', () => {
-    if (isClock()) {
-      state.clock.avoidDuplicates = avoidDuplicatesEl.checked;
-    } else {
-      state.generator.avoidDuplicates = avoidDuplicatesEl.checked;
-    }
+    activeCountable().avoidDuplicates = avoidDuplicatesEl.checked;
     emitChange();
   });
   shuffleEl.addEventListener('change', () => {
@@ -321,17 +376,13 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
       seedEl.value = digitsOnly;
     }
     if (digitsOnly !== '') {
-      if (isClock()) {
-        state.clock.seed = Number(digitsOnly);
-      } else {
-        state.generator.seed = Number(digitsOnly);
-      }
+      activeCountable().seed = Number(digitsOnly);
       emitChange();
     }
   });
   seedEl.addEventListener('blur', () => {
     seedEl.readOnly = true;
-    seedEl.value = String(isClock() ? state.clock.seed : state.generator.seed);
+    seedEl.value = String(activeCountable().seed);
   });
 
   columnsEl.addEventListener('change', () => {
@@ -383,13 +434,14 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
       emitChange();
     },
     randomizeSeed: () => {
-      // Slumpar båda bladtypernas seed tillsammans, så att den delade
+      // Slumpar alla tre bladtypernas seed tillsammans, så att den delade
       // seed-knappen/fältet ger ett förutsägbart resultat oavsett vilken typ
       // som råkar vara aktiv — de driver annars annars isär vid manuell
       // redigering av seed-fältet, se seedEl:s input-hanterare ovan.
       const seed = Math.floor(Math.random() * 1_000_000);
       state.generator.seed = seed;
       state.clock.seed = seed;
+      state.fraction.seed = seed;
       refreshFromState();
       emitChange();
     },
@@ -442,12 +494,27 @@ function renderTemplate(): string {
     .map(([value, label]) => `<option value="${value}">${label}</option>`)
     .join('');
 
+  const fractionDenominatorCheckboxes = FRACTION_DENOMINATORS.map(
+    (d) => `<label><input type="checkbox" id="fraction-denom-${d}" /> 1/${d}</label>`,
+  ).join('');
+  const fractionShapeOptions = (
+    Object.entries(FRACTION_SHAPE_LABELS) as [FractionShapeMode, string][]
+  )
+    .map(([value, label]) => `<option value="${value}">${label}</option>`)
+    .join('');
+  const fractionDirectionOptions = (
+    Object.entries(FRACTION_DIRECTION_LABELS) as [FractionDirectionMode, string][]
+  )
+    .map(([value, label]) => `<option value="${value}">${label}</option>`)
+    .join('');
+
   return `
     <section aria-labelledby="sheettype-heading">
       <h2 id="sheettype-heading">Typ av blad</h2>
       <div class="sheet-type-toggle" id="sheet-type-toggle">
         <label><input type="radio" name="sheetType" value="arithmetic" /> Räknesätt</label>
         <label><input type="radio" name="sheetType" value="clock" /> Klockan</label>
+        <label><input type="radio" name="sheetType" value="fraction" /> Bråk</label>
       </div>
     </section>
 
@@ -490,6 +557,22 @@ function renderTemplate(): string {
       <div class="field-grid">
         <label><input type="checkbox" id="clock-showNumerals" /> Visa siffror på urtavlan</label>
         <label><input type="checkbox" id="clock-showMinuteTicks" /> Visa minutstreck</label>
+      </div>
+    </section>
+
+    <section aria-labelledby="fraction-heading" id="fraction-section">
+      <h2 id="fraction-heading">Bråk</h2>
+      <div class="field-grid" id="fraction-denominators">
+        <span class="level-chips-label">Nämnare:</span>
+        ${fractionDenominatorCheckboxes}
+      </div>
+      <div class="field-grid">
+        <label>Form
+          <select id="fraction-shape">${fractionShapeOptions}</select>
+        </label>
+        <label>Riktning
+          <select id="fraction-direction">${fractionDirectionOptions}</select>
+        </label>
       </div>
     </section>
 
