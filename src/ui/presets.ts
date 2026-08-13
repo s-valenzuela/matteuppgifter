@@ -98,6 +98,7 @@ export const PRESETS: Preset[] = [
       state.fraction.denominators = [2, 3, 4];
       state.fraction.shape = 'circle';
       state.fraction.direction = 'identify';
+      state.document.answerStyle = 'box';
       state.document.header.title = 'Bråk — cirkel';
       return state;
     },
@@ -111,6 +112,7 @@ export const PRESETS: Preset[] = [
       state.fraction.denominators = [2, 3, 4, 5, 6];
       state.fraction.shape = 'mixed';
       state.fraction.direction = 'shade';
+      state.document.answerStyle = 'box';
       state.document.header.title = 'Bråk — färglägg';
       return state;
     },

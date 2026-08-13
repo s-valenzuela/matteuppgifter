@@ -11,6 +11,7 @@ function fractionConfig(overrides: Partial<FractionGeneratorConfig> = {}): Fract
     denominators: [...FRACTION_DENOMINATORS],
     shape: 'mixed',
     direction: 'identify',
+    showPercent: false,
     count: 20,
     avoidDuplicates: false,
     seed: 1,

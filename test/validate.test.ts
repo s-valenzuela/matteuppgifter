@@ -24,6 +24,7 @@ function baseFractionConfig(
     denominators: [...FRACTION_DENOMINATORS],
     shape: 'mixed',
     direction: 'identify',
+    showPercent: false,
     count: 12,
     avoidDuplicates: true,
     seed: 1,

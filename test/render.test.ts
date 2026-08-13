@@ -8,6 +8,7 @@ import {
   renderFractionSheetToPdf,
   renderProblemsToPdf,
   type ClockDocumentOptions,
+  type FractionDocumentOptions,
 } from '../src/pdf/render';
 import type { ClockGeneratorConfig, DocumentConfig, FractionGeneratorConfig } from '../src/types';
 import { baseConfig, opConfig } from './helpers';
@@ -32,6 +33,7 @@ function baseFractionConfig(
     denominators: [...FRACTION_DENOMINATORS],
     shape: 'mixed',
     direction: 'identify',
+    showPercent: false,
     // 9, inte 12 som klockans motsvarighet — bråkfigurens två textrader
     // (täljare/streck/nämnare, se drawStackedFractionText) gör varje rad
     // högre än klockans enda textrad, så en 3×3-sida (inte 3×4) ryms på ett
@@ -344,15 +346,24 @@ describe('renderClockSheetToPdf', () => {
 });
 
 describe('renderFractionSheetToPdf', () => {
+  function fractionOptions(
+    overrides: Partial<FractionDocumentOptions> = {},
+  ): FractionDocumentOptions {
+    return {
+      showPercent: false,
+      ...overrides,
+    };
+  }
+
   it('genererar en icke-tom PDF för ett litet bråkblad', () => {
     const problems = generateFractionProblems(baseFractionConfig());
-    const doc = renderFractionSheetToPdf(problems, baseDocumentConfig());
+    const doc = renderFractionSheetToPdf(problems, baseDocumentConfig(), fractionOptions());
     expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
     expect(doc.getNumberOfPages()).toBe(1);
   });
 
   it('lämnar en enda tom sida med bara rubriken när inga uppgifter finns', () => {
-    const doc = renderFractionSheetToPdf([], baseDocumentConfig());
+    const doc = renderFractionSheetToPdf([], baseDocumentConfig(), fractionOptions());
     expect(doc.getNumberOfPages()).toBe(1);
   });
 
@@ -368,7 +379,7 @@ describe('renderFractionSheetToPdf', () => {
       layout: 'fraction',
     });
 
-    const doc = renderFractionSheetToPdf(problems, config);
+    const doc = renderFractionSheetToPdf(problems, config, fractionOptions());
     expect(doc.getNumberOfPages()).toBe(layout.pageCount);
   });
 
@@ -384,26 +395,33 @@ describe('renderFractionSheetToPdf', () => {
       layout: 'fraction',
     });
 
-    const withoutKey = renderFractionSheetToPdf(problems, config);
-    const withKey = renderFractionSheetToPdf(problems, { ...config, includeAnswerKey: true });
+    const withoutKey = renderFractionSheetToPdf(problems, config, fractionOptions());
+    const withKey = renderFractionSheetToPdf(
+      problems,
+      { ...config, includeAnswerKey: true },
+      fractionOptions(),
+    );
 
     expect(withoutKey.getNumberOfPages()).toBe(layout.pageCount);
     expect(withKey.getNumberOfPages()).toBe(layout.pageCount * 2);
   });
 
-  it('fungerar för alla riktningar, former, svarsstilar och nämnare, med facit, utan att kasta fel', () => {
+  it('fungerar för alla riktningar, former, svarsstilar, nämnare och procentvisning, med facit, utan att kasta fel', () => {
     for (const direction of ['identify', 'shade', 'mixed'] as const) {
       for (const shape of ['circle', 'bar', 'mixed'] as const) {
         for (const answerStyle of ['blank', 'line', 'box'] as const) {
-          for (const denominators of [[2], [3], [4], [5, 6], [8, 10, 12]]) {
-            const problems = generateFractionProblems(
-              baseFractionConfig({ direction, shape, denominators, count: 20 }),
-            );
-            const doc = renderFractionSheetToPdf(
-              problems,
-              baseDocumentConfig({ answerStyle, includeAnswerKey: true }),
-            );
-            expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+          for (const showPercent of [true, false]) {
+            for (const denominators of [[2], [3], [4], [5, 6], [8, 10, 12]]) {
+              const problems = generateFractionProblems(
+                baseFractionConfig({ direction, shape, denominators, count: 20 }),
+              );
+              const doc = renderFractionSheetToPdf(
+                problems,
+                baseDocumentConfig({ answerStyle, includeAnswerKey: true }),
+                fractionOptions({ showPercent }),
+              );
+              expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+            }
           }
         }
       }

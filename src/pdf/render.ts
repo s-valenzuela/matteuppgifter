@@ -4,6 +4,7 @@ import type {
   ClockGeneratorConfig,
   ClockProblem,
   DocumentConfig,
+  FractionGeneratorConfig,
   FractionProblem,
   Problem,
 } from '../types';
@@ -665,9 +666,15 @@ function drawClockDigitalPrompt(
  * renderXToPdf-funktionerna, men har ett eget uppgiftsformat (figur + ett
  * riktigt uppställt bråk i stället för en textrad), se drawFractionProblem.
  */
+/** Den del av FractionGeneratorConfig som faktiskt behövs för att RITA ett
+ * bråkblad — count/avoidDuplicates/seed styr bara genereringen, se
+ * core/fractions.ts. Samma mönster som ClockDocumentOptions. */
+export type FractionDocumentOptions = Pick<FractionGeneratorConfig, 'showPercent'>;
+
 export function renderFractionSheetToPdf(
   problems: FractionProblem[],
   config: DocumentConfig,
+  fractionOptions: FractionDocumentOptions,
 ): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const layout = computeGridLayout({
@@ -683,11 +690,14 @@ export function renderFractionSheetToPdf(
     return doc;
   }
 
-  renderFractionSection(doc, problems, layout, config, { showAnswers: false, sectionLabel: null });
+  renderFractionSection(doc, problems, layout, config, fractionOptions, {
+    showAnswers: false,
+    sectionLabel: null,
+  });
 
   if (config.includeAnswerKey) {
     doc.addPage();
-    renderFractionSection(doc, problems, layout, config, {
+    renderFractionSection(doc, problems, layout, config, fractionOptions, {
       showAnswers: true,
       sectionLabel: 'Facit',
     });
@@ -701,6 +711,7 @@ function renderFractionSection(
   problems: FractionProblem[],
   layout: GridLayout,
   config: DocumentConfig,
+  fractionOptions: FractionDocumentOptions,
   options: SectionOptions,
 ): void {
   for (let page = 0; page < layout.pageCount; page++) {
@@ -716,6 +727,7 @@ function renderFractionSection(
           position,
           layout,
           config,
+          fractionOptions,
           options.showAnswers,
         );
       }
@@ -737,6 +749,7 @@ function drawFractionProblem(
   position: CellPosition,
   layout: GridLayout,
   config: DocumentConfig,
+  fractionOptions: FractionDocumentOptions,
   showAnswers: boolean,
 ): void {
   const size = layout.fractionSizeMm!;
@@ -775,12 +788,33 @@ function drawFractionProblem(
       String(problem.numerator),
       String(problem.denominator),
       config.fontSizePt,
+      fractionOptions.showPercent
+        ? formatFractionPercent(problem.numerator, problem.denominator)
+        : undefined,
+      layout.columnWidthMm,
     );
     return;
   }
 
   // 'identify', innan facit — figuren är svaret, eleven fyller i täljare/nämnare.
   drawStackedFractionBlank(doc, centerX, position.yMm, config.answerStyle, config.fontSizePt);
+}
+
+/**
+ * T.ex. "75 %" om det går jämnt upp, annars "~33 %" — avrundat till
+ * närmaste heltal så att en obekant elev alltid möts av ett rent tal, med
+ * "~" som ärlig markering när avrundningen faktiskt tappar information.
+ * Tilde i stället för det matematiska tecknet "≈": jsPDF:s inbyggda
+ * Helvetica-typsnitt stöder bara WinAnsiEncoding (ungefär Windows-1252) —
+ * "≈" (U+2248) saknas där och renderades som rappakalja ("H 3 3" i stället
+ * för "33") tills detta upptäcktes genom visuell verifiering av en
+ * rasteriserad PDF-sida.
+ */
+function formatFractionPercent(numerator: number, denominator: number): string {
+  const exact = (numerator / denominator) * 100;
+  const rounded = Math.round(exact);
+  const prefix = Number.isInteger(exact) ? '' : '~';
+  return `${prefix}${rounded} %`;
 }
 
 /** Kortare än den vanliga BLANK_PLACEHOLDER — en täljare/nämnare är alltid
@@ -851,6 +885,10 @@ function computeFractionBlankStackYs(baselineY: number): FractionStackYs {
   return { numeratorY, ruleY, denominatorY };
 }
 
+/** Luft mellan bråkstrecket/procenttexten och nästa kolumn, i mm — samma
+ * princip som CLOCK_LABEL_MAX_WIDTH_MARGIN_MM. */
+const FRACTION_PERCENT_MARGIN_MM = 2;
+
 function drawStackedFractionText(
   doc: jsPDF,
   centerX: number,
@@ -858,6 +896,8 @@ function drawStackedFractionText(
   numeratorText: string,
   denominatorText: string,
   fontSizePt: number,
+  percentText?: string,
+  columnWidthMm?: number,
 ): void {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(fontSizePt);
@@ -870,6 +910,53 @@ function drawStackedFractionText(
     Math.max(doc.getTextWidth(numeratorText), doc.getTextWidth(denominatorText)) / 2 +
     FRACTION_RULE_PADDING_MM;
   doc.line(centerX - ruleHalfWidth, ruleY, centerX + ruleHalfWidth, ruleY);
+
+  if (percentText !== undefined) {
+    drawFractionPercentSuffix(
+      doc,
+      centerX,
+      ruleHalfWidth,
+      ruleY,
+      percentText,
+      fontSizePt,
+      columnWidthMm,
+    );
+  }
+}
+
+/**
+ * Skriver "= 75 %" till höger om bråkstrecket, i höjd med strecket (i
+ * stället för under nämnaren, som annars hade krävt extra radhöjd —
+ * kolumnbredden har oftare ledigt utrymme i sidled, se drawFractionShape).
+ * Krymper teckenstorleken (aldrig under MIN_CLOCK_LABEL_FONT_PT, samma
+ * princip som drawFittedCenteredClockLabel) om den annars skulle sticka in i
+ * nästa kolumn.
+ */
+function drawFractionPercentSuffix(
+  doc: jsPDF,
+  centerX: number,
+  ruleHalfWidth: number,
+  ruleY: number,
+  percentText: string,
+  basePt: number,
+  columnWidthMm: number | undefined,
+): void {
+  const suffix = ` = ${percentText}`;
+  const startX = centerX + ruleHalfWidth;
+  const maxWidthMm =
+    columnWidthMm !== undefined
+      ? columnWidthMm / 2 - ruleHalfWidth - FRACTION_PERCENT_MARGIN_MM
+      : undefined;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(basePt);
+  const width = doc.getTextWidth(suffix);
+  if (maxWidthMm !== undefined && maxWidthMm > 0 && width > maxWidthMm) {
+    doc.setFontSize(Math.max(basePt * (maxWidthMm / width), MIN_CLOCK_LABEL_FONT_PT));
+  }
+  // Baslinjen sänks en bit under strecket så texten optiskt centreras kring
+  // det, i stället för att sitta ovanpå det.
+  doc.text(suffix, startX, ruleY + basePt * MM_PER_PT * 0.32);
 }
 
 function drawStackedFractionBlank(

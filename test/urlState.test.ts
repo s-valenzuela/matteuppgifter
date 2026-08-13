@@ -217,6 +217,7 @@ describe('encodeState / decodeState', () => {
         denominators: [5, 8],
         shape: 'mixed',
         direction: 'shade',
+        showPercent: true,
         count: 24,
         avoidDuplicates: false,
         seed: 555,

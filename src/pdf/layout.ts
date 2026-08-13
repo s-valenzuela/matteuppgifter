@@ -111,7 +111,7 @@ const FRACTION_COLUMN_GUTTER_MM = 6;
 /** Avstånd mellan figurens nederkant och täljarens överkant, i mm — samma
  * princip som CLOCK_FACE_LABEL_GAP_MM. Exporterad så att render.ts kan
  * placera figurens centrum utifrån exakt samma tal som här reserverats. */
-export const FRACTION_SHAPE_LABEL_GAP_MM = 5;
+export const FRACTION_SHAPE_LABEL_GAP_MM = 9;
 /** Extra luft under nämnarraden, för nedstick, innan nästa rads figur. */
 const FRACTION_LABEL_DESCENDER_MM = 2;
 /** Extra luft mellan en bråkrads block och nästa rads block. */
