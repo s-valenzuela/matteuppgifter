@@ -6,11 +6,20 @@ import type {
   DocumentConfig,
   FractionGeneratorConfig,
   FractionProblem,
+  GeometryGeneratorConfig,
+  GeometryProblem,
   Problem,
 } from '../types';
+import {
+  formatGeometryValue,
+  geometryAnswer,
+  geometryMeasureLabel,
+  geometryUnit,
+} from '../core/geometry';
 import { computeOperandDigitCounts, formatAnswer, OPERATION_SYMBOLS } from './format';
 import { drawClockFace } from './clockFace';
 import { drawFractionShape } from './fractionShape';
+import { drawGeometryFigure } from './geometryFigure';
 import {
   A4_METRICS,
   CLOCK_FACE_LABEL_GAP_MM,
@@ -19,6 +28,7 @@ import {
   FRACTION_BLANK_STACK_GAP_MM,
   fractionStackReachAboveMm,
   FRACTION_SHAPE_LABEL_GAP_MM,
+  GEOMETRY_FIGURE_LABEL_GAP_MM,
   HEADER_EXTRA_LINE_MM,
   MM_PER_PT,
   VERTICAL_BOX_GAP_FACTOR,
@@ -522,6 +532,8 @@ function renderClockSection(
 const MIN_CLOCK_LABEL_FONT_PT = 7;
 /** Liten säkerhetsmarginal i sidled mot nästa kolumn. */
 const CLOCK_LABEL_MAX_WIDTH_MARGIN_MM = 2;
+/** Motsvarande marginal för geometribladets svarsrad, se drawGeometryProblem. */
+const GEOMETRY_LABEL_MAX_WIDTH_MARGIN_MM = 2;
 
 function drawClockProblem(
   doc: jsPDF,
@@ -654,11 +666,43 @@ function drawClockReadPrompt(
   maxWidthMm: number,
   basePt: number,
 ): void {
+  drawCenteredPromptWithBlank(doc, {
+    centerX,
+    baselineY,
+    prompt: 'Klockan är ',
+    answerStyle,
+    maxWidthMm,
+    basePt,
+  });
+}
+
+interface CenteredPromptOptions {
+  centerX: number;
+  baselineY: number;
+  /** Texten före tomrummet, t.ex. "Klockan är " eller "Area = ". */
+  prompt: string;
+  /** Valfri text efter tomrummet, t.ex. " cm²". Räknas in i centreringen. */
+  suffix?: string;
+  answerStyle: DocumentConfig['answerStyle'];
+  maxWidthMm: number;
+  basePt: number;
+}
+
+/**
+ * "prompt ____ suffix", centrerat som EN enhet kring centerX och krympt om
+ * det inte ryms i kolumnen. jsPDF:s `align: 'center'` centrerar bara ett
+ * enskilt text()-anrop, så hela bredden räknas ut först och delarna placeras
+ * därefter för hand — samma teknik som drawOperandBlank använder för att
+ * hålla en tom plats inom en exakt reserverad bredd.
+ *
+ * Delad av klockans "Klockan är ____" och geometrins "Area = ____ cm²".
+ */
+function drawCenteredPromptWithBlank(doc: jsPDF, options: CenteredPromptOptions): void {
+  const { centerX, baselineY, prompt, suffix = '', answerStyle, maxWidthMm, basePt } = options;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(basePt);
-  const prompt = 'Klockan är ';
 
-  const measure = (): { promptWidth: number; blankWidth: number } => ({
+  const measure = (): { promptWidth: number; blankWidth: number; suffixWidth: number } => ({
     promptWidth: doc.getTextWidth(prompt),
     blankWidth:
       answerStyle === 'blank'
@@ -666,17 +710,18 @@ function drawClockReadPrompt(
         : answerStyle === 'line'
           ? LINE_LENGTH_MM
           : BOX_SIZE_MM,
+    suffixWidth: suffix ? doc.getTextWidth(suffix) : 0,
   });
 
-  let { promptWidth, blankWidth } = measure();
-  if (promptWidth + blankWidth > maxWidthMm) {
-    doc.setFontSize(
-      Math.max(basePt * (maxWidthMm / (promptWidth + blankWidth)), MIN_CLOCK_LABEL_FONT_PT),
-    );
-    ({ promptWidth, blankWidth } = measure());
+  let { promptWidth, blankWidth, suffixWidth } = measure();
+  let totalWidth = promptWidth + blankWidth + suffixWidth;
+  if (totalWidth > maxWidthMm) {
+    doc.setFontSize(Math.max(basePt * (maxWidthMm / totalWidth), MIN_CLOCK_LABEL_FONT_PT));
+    ({ promptWidth, blankWidth, suffixWidth } = measure());
+    totalWidth = promptWidth + blankWidth + suffixWidth;
   }
 
-  const startX = centerX - (promptWidth + blankWidth) / 2;
+  const startX = centerX - totalWidth / 2;
   doc.text(prompt, startX, baselineY);
   const blankStartX = startX + promptWidth;
 
@@ -685,11 +730,15 @@ function drawClockReadPrompt(
       doc.text(BLANK_PLACEHOLDER, blankStartX, baselineY);
       break;
     case 'line':
-      doc.line(blankStartX, baselineY + 1, blankStartX + LINE_LENGTH_MM, baselineY + 1);
+      doc.line(blankStartX, baselineY + 1, blankStartX + blankWidth, baselineY + 1);
       break;
     case 'box':
       doc.rect(blankStartX, baselineY - BOX_SIZE_MM + 2, BOX_SIZE_MM, BOX_SIZE_MM);
       break;
+  }
+
+  if (suffix) {
+    doc.text(suffix, blankStartX + blankWidth, baselineY);
   }
 }
 
@@ -1228,4 +1277,143 @@ function drawCenteredBlank(
       doc.rect(centerX - BOX_SIZE_MM / 2, baselineY - BOX_SIZE_MM + 2, BOX_SIZE_MM, BOX_SIZE_MM);
       break;
   }
+}
+
+/**
+ * Geometriblad delar sidhuvud/sidfot och sidbrytningslogik med de andra
+ * renderXToPdf-funktionerna, men har ett eget uppgiftsformat: en måttsatt
+ * figur med en svarsrad under, se drawGeometryProblem.
+ */
+/** Den del av GeometryGeneratorConfig som faktiskt behövs för att RITA ett
+ * geometriblad — resten styr bara genereringen, se core/geometry.ts. Samma
+ * mönster som ClockDocumentOptions. */
+export type GeometryDocumentOptions = Pick<GeometryGeneratorConfig, 'showUnits'>;
+
+export function renderGeometrySheetToPdf(
+  problems: GeometryProblem[],
+  config: DocumentConfig,
+  geometryOptions: GeometryDocumentOptions,
+): jsPDF {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const layout = computeGridLayout({
+    problemCount: problems.length,
+    fontSizePt: config.fontSizePt,
+    columns: config.columns,
+    layout: 'geometry',
+    metrics: layoutMetricsFor(config, problems.length),
+  });
+
+  if (layout.pageCount === 0) {
+    drawHeader(doc, config, null, false);
+    drawFooter(doc, 0, 1, config.seed);
+    return doc;
+  }
+
+  renderGeometrySection(doc, problems, layout, config, geometryOptions, {
+    showAnswers: false,
+    sectionLabel: null,
+  });
+
+  if (config.includeAnswerKey) {
+    doc.addPage();
+    renderGeometrySection(doc, problems, layout, config, geometryOptions, {
+      showAnswers: true,
+      sectionLabel: 'Facit',
+    });
+  }
+
+  return doc;
+}
+
+function renderGeometrySection(
+  doc: jsPDF,
+  problems: GeometryProblem[],
+  layout: GridLayout,
+  config: DocumentConfig,
+  geometryOptions: GeometryDocumentOptions,
+  options: SectionOptions,
+): void {
+  for (let page = 0; page < layout.pageCount; page++) {
+    if (page > 0) {
+      doc.addPage();
+    }
+    const showExampleNote = !options.showAnswers && config.exampleFirst && page === 0;
+    drawHeader(doc, config, options.sectionLabel, showExampleNote);
+    for (const position of layout.positions) {
+      if (position.page === page) {
+        const showAnswers = options.showAnswers || (config.exampleFirst && position.index === 0);
+        drawGeometryProblem(
+          doc,
+          problems[position.index],
+          position,
+          layout,
+          config,
+          geometryOptions,
+          showAnswers,
+        );
+      }
+    }
+    drawFooter(doc, page, layout.pageCount, config.seed);
+  }
+}
+
+/**
+ * Figuren (med sina mått) överst, svarsraden under: "Area = ____ cm²", eller
+ * med svaret ifyllt i facit. Etiketten skrivs ut även när bara ett mått är
+ * valt — i 'mixed'-läget växlar uppgifterna mellan area och omkrets, och då
+ * måste varje uppgift säga vilket den frågar efter.
+ *
+ * position.yMm är (liksom i de andra layouterna) baslinjen för radens sista
+ * textrad. Figurrutans topp räknas uppåt därifrån med exakt samma tal
+ * (geometryFigureSizeMm, GEOMETRY_FIGURE_LABEL_GAP_MM) som layout.ts
+ * reserverade radhöjd utifrån.
+ */
+function drawGeometryProblem(
+  doc: jsPDF,
+  problem: GeometryProblem,
+  position: CellPosition,
+  layout: GridLayout,
+  config: DocumentConfig,
+  geometryOptions: GeometryDocumentOptions,
+  showAnswers: boolean,
+): void {
+  const size = layout.geometryFigureSizeMm!;
+  const centerX = position.xMm + layout.columnWidthMm / 2;
+  const topY = position.yMm - GEOMETRY_FIGURE_LABEL_GAP_MM - size;
+
+  drawGeometryFigure(
+    doc,
+    problem,
+    centerX,
+    topY,
+    size,
+    geometryOptions.showUnits,
+    config.fontSizePt,
+  );
+
+  const maxWidthMm = layout.columnWidthMm - GEOMETRY_LABEL_MAX_WIDTH_MARGIN_MM;
+  const label = geometryMeasureLabel(problem.measure);
+  const unit = geometryOptions.showUnits ? ` ${geometryUnit(problem.measure)}` : '';
+
+  if (showAnswers) {
+    drawFittedCenteredClockLabel(
+      doc,
+      `${label} = ${formatGeometryValue(geometryAnswer(problem))}${unit}`,
+      centerX,
+      position.yMm,
+      maxWidthMm,
+      config.fontSizePt,
+    );
+    return;
+  }
+
+  drawCenteredPromptWithBlank(doc, {
+    centerX,
+    baselineY: position.yMm,
+    prompt: `${label} = `,
+    suffix: unit,
+    answerStyle: config.answerStyle,
+    maxWidthMm,
+    basePt: config.fontSizePt,
+  });
 }

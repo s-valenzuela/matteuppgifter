@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { FRACTION_DENOMINATORS } from '../src/core/fractions';
-import { validateClockConfig, validateConfig, validateFractionConfig } from '../src/core/validate';
-import type { ClockGeneratorConfig, FractionGeneratorConfig } from '../src/types';
+import {
+  validateClockConfig,
+  validateConfig,
+  validateFractionConfig,
+  validateGeometryConfig,
+} from '../src/core/validate';
+import type {
+  ClockGeneratorConfig,
+  FractionGeneratorConfig,
+  GeometryGeneratorConfig,
+} from '../src/types';
 import { baseConfig, opConfig } from './helpers';
 
 function baseClockConfig(overrides: Partial<ClockGeneratorConfig> = {}): ClockGeneratorConfig {
@@ -190,5 +199,61 @@ describe('validateFractionConfig', () => {
     const { config, warnings } = validateFractionConfig(baseFractionConfig({ denominators: [] }));
     expect(config.denominators).toEqual([...FRACTION_DENOMINATORS]);
     expect(warnings.some((w) => w.includes('nämnare'))).toBe(true);
+  });
+});
+
+describe('validateGeometryConfig', () => {
+  function baseGeometryConfig(
+    overrides: Partial<GeometryGeneratorConfig> = {},
+  ): GeometryGeneratorConfig {
+    return {
+      shape: 'rectangle',
+      measure: 'area',
+      sideRange: { min: 2, max: 10 },
+      showUnits: true,
+      count: 12,
+      avoidDuplicates: true,
+      seed: 1,
+      ...overrides,
+    };
+  }
+
+  it('rätar ut ett negativt antal uppgifter och varnar', () => {
+    const { config, warnings } = validateGeometryConfig(baseGeometryConfig({ count: -3 }));
+    expect(config.count).toBe(0);
+    expect(warnings.some((w) => w.includes('Antalet uppgifter'))).toBe(true);
+  });
+
+  it('höjer mått under 1 cm till 1 och varnar — en sida på 0 cm ger ingen figur', () => {
+    const { config, warnings } = validateGeometryConfig(
+      baseGeometryConfig({ sideRange: { min: -4, max: 0 } }),
+    );
+    expect(config.sideRange.min).toBeGreaterThanOrEqual(1);
+    expect(config.sideRange.max).toBeGreaterThanOrEqual(1);
+    expect(warnings.some((w) => w.includes('Måtten'))).toBe(true);
+  });
+
+  it('vänder ett omvänt intervall rätt', () => {
+    const { config } = validateGeometryConfig(
+      baseGeometryConfig({ sideRange: { min: 12, max: 3 } }),
+    );
+    expect(config.sideRange.min).toBeLessThanOrEqual(config.sideRange.max);
+  });
+
+  it('varnar när fler unika uppgifter begärs än inställningarna rymmer', () => {
+    const { warnings } = validateGeometryConfig(
+      baseGeometryConfig({
+        shape: 'circle',
+        measure: 'area',
+        sideRange: { min: 1, max: 3 },
+        count: 40,
+      }),
+    );
+    expect(warnings.some((w) => w.includes('unika uppgifter'))).toBe(true);
+  });
+
+  it('varnar inte för en rimlig konfiguration', () => {
+    const { warnings } = validateGeometryConfig(baseGeometryConfig());
+    expect(warnings).toEqual([]);
   });
 });

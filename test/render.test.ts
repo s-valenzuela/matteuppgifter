@@ -2,15 +2,23 @@ import { describe, expect, it } from 'vitest';
 import { generateClockProblems } from '../src/core/clock';
 import { FRACTION_DENOMINATORS, generateFractionProblems } from '../src/core/fractions';
 import { generateProblems } from '../src/core/generate';
+import { generateGeometryProblems } from '../src/core/geometry';
 import { A4_METRICS, computeGridLayout, computeHeaderHeightMm } from '../src/pdf/layout';
 import {
   renderClockSheetToPdf,
   renderFractionSheetToPdf,
+  renderGeometrySheetToPdf,
   renderProblemsToPdf,
   type ClockDocumentOptions,
   type FractionDocumentOptions,
+  type GeometryDocumentOptions,
 } from '../src/pdf/render';
-import type { ClockGeneratorConfig, DocumentConfig, FractionGeneratorConfig } from '../src/types';
+import type {
+  ClockGeneratorConfig,
+  DocumentConfig,
+  FractionGeneratorConfig,
+  GeometryGeneratorConfig,
+} from '../src/types';
 import { baseConfig, opConfig } from './helpers';
 
 function baseClockConfig(overrides: Partial<ClockGeneratorConfig> = {}): ClockGeneratorConfig {
@@ -624,5 +632,130 @@ describe('header.instructions och exampleFirst', () => {
         direction: 'identify',
       }).getNumberOfPages(),
     ).toBe(1);
+  });
+});
+
+describe('renderGeometrySheetToPdf', () => {
+  function geometryOptions(
+    overrides: Partial<GeometryDocumentOptions> = {},
+  ): GeometryDocumentOptions {
+    return { showUnits: true, ...overrides };
+  }
+
+  function baseGeometryConfig(
+    overrides: Partial<GeometryGeneratorConfig> = {},
+  ): GeometryGeneratorConfig {
+    return {
+      shape: 'mixed',
+      measure: 'mixed',
+      sideRange: { min: 2, max: 10 },
+      showUnits: true,
+      count: 9,
+      avoidDuplicates: true,
+      seed: 1,
+      ...overrides,
+    };
+  }
+
+  it('genererar en icke-tom PDF för ett litet geometriblad', () => {
+    const problems = generateGeometryProblems(baseGeometryConfig());
+    const doc = renderGeometrySheetToPdf(problems, baseDocumentConfig(), geometryOptions());
+    expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+    expect(doc.getNumberOfPages()).toBe(1);
+  });
+
+  it('lämnar en enda tom sida med bara rubriken när inga uppgifter finns', () => {
+    const doc = renderGeometrySheetToPdf([], baseDocumentConfig(), geometryOptions());
+    expect(doc.getNumberOfPages()).toBe(1);
+  });
+
+  it('matchar sidantalet från layout-beräkningen för geometriläget', () => {
+    const problems = generateGeometryProblems(
+      baseGeometryConfig({ count: 60, avoidDuplicates: false }),
+    );
+    const config = baseDocumentConfig({ columns: 3, fontSizePt: 14 });
+    const layout = computeGridLayout({
+      problemCount: problems.length,
+      fontSizePt: config.fontSizePt,
+      columns: config.columns,
+      layout: 'geometry',
+    });
+
+    const doc = renderGeometrySheetToPdf(problems, config, geometryOptions());
+    expect(doc.getNumberOfPages()).toBe(layout.pageCount);
+  });
+
+  it('lägger till facit-sidor sist när includeAnswerKey är satt', () => {
+    const problems = generateGeometryProblems(
+      baseGeometryConfig({ count: 60, avoidDuplicates: false }),
+    );
+    const config = baseDocumentConfig({ columns: 3, fontSizePt: 14 });
+    const layout = computeGridLayout({
+      problemCount: problems.length,
+      fontSizePt: config.fontSizePt,
+      columns: config.columns,
+      layout: 'geometry',
+    });
+
+    const withoutKey = renderGeometrySheetToPdf(problems, config, geometryOptions());
+    const withKey = renderGeometrySheetToPdf(
+      problems,
+      { ...config, includeAnswerKey: true },
+      geometryOptions(),
+    );
+
+    expect(withoutKey.getNumberOfPages()).toBe(layout.pageCount);
+    expect(withKey.getNumberOfPages()).toBe(layout.pageCount * 2);
+  });
+
+  it('fungerar för alla figurer, mått, svarsstilar och enhetsval, med facit, utan att kasta fel', () => {
+    for (const shape of ['rectangle', 'triangle', 'circle', 'mixed'] as const) {
+      for (const measure of ['area', 'perimeter', 'mixed'] as const) {
+        for (const answerStyle of ['blank', 'line', 'box'] as const) {
+          for (const showUnits of [true, false]) {
+            const problems = generateGeometryProblems(
+              baseGeometryConfig({ shape, measure, showUnits, count: 12 }),
+            );
+            const doc = renderGeometrySheetToPdf(
+              problems,
+              baseDocumentConfig({ answerStyle, includeAnswerKey: true }),
+              geometryOptions({ showUnits }),
+            );
+            expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+          }
+        }
+      }
+    }
+  });
+
+  it('fungerar för smala kolumner och extrema teckenstorlekar utan att kasta fel', () => {
+    const problems = generateGeometryProblems(baseGeometryConfig({ count: 12 }));
+    for (const columns of [1, 2, 4, 6] as const) {
+      for (const fontSizePt of [10, 14, 24, 32]) {
+        const doc = renderGeometrySheetToPdf(
+          problems,
+          baseDocumentConfig({ columns, fontSizePt }),
+          geometryOptions(),
+        );
+        expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('respekterar instruktionsrad och löst exempel, precis som de andra bladtyperna', () => {
+    const problems = generateGeometryProblems(baseGeometryConfig({ count: 9 }));
+    const config = baseDocumentConfig({
+      exampleFirst: true,
+      includeAnswerKey: true,
+      header: {
+        title: 'Matteuppgifter',
+        showName: true,
+        showDate: true,
+        instructions: 'Beräkna arean.',
+      },
+    });
+    const doc = renderGeometrySheetToPdf(problems, config, geometryOptions());
+    expect(doc.getNumberOfPages()).toBe(2);
+    expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
   });
 });

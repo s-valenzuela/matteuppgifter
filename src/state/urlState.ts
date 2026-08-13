@@ -6,6 +6,8 @@ import type {
   DocumentLayout,
   FractionDirectionMode,
   FractionShapeMode,
+  GeometryMeasureMode,
+  GeometryShapeMode,
   Operation,
   OperationConfig,
   Range,
@@ -16,7 +18,7 @@ import { createDefaultState, type AppState } from '../ui/state';
 const OPERATION_KEYS: readonly Operation[] = ['add', 'sub', 'mul', 'div'];
 const ANSWER_STYLES: readonly AnswerStyle[] = ['blank', 'line', 'box'];
 const DOCUMENT_LAYOUTS: readonly DocumentLayout[] = ['grid', 'vertical'];
-const SHEET_TYPES: readonly SheetType[] = ['arithmetic', 'clock', 'fraction'];
+const SHEET_TYPES: readonly SheetType[] = ['arithmetic', 'clock', 'fraction', 'geometry'];
 const CLOCK_STEPS: readonly ClockStep[] = ['hour', 'half', 'quarter', 'five'];
 const CLOCK_DIRECTIONS: readonly ClockDirectionMode[] = [
   'read',
@@ -25,6 +27,8 @@ const CLOCK_DIRECTIONS: readonly ClockDirectionMode[] = [
   'digitalDraw',
   'mixed',
 ];
+const GEOMETRY_SHAPES: readonly GeometryShapeMode[] = ['rectangle', 'triangle', 'circle', 'mixed'];
+const GEOMETRY_MEASURES: readonly GeometryMeasureMode[] = ['area', 'perimeter', 'mixed'];
 const FRACTION_SHAPES: readonly FractionShapeMode[] = ['circle', 'bar', 'mixed'];
 const FRACTION_DIRECTIONS: readonly FractionDirectionMode[] = [
   'identify',
@@ -95,6 +99,15 @@ export function encodeState(state: AppState): URLSearchParams {
   params.set('fdup', boolStr(state.fraction.avoidDuplicates));
   params.set('fseed', String(state.fraction.seed));
 
+  params.set('gshape', state.geometry.shape);
+  params.set('gmeasure', state.geometry.measure);
+  params.set('gmin', String(state.geometry.sideRange.min));
+  params.set('gmax', String(state.geometry.sideRange.max));
+  params.set('gunits', boolStr(state.geometry.showUnits));
+  params.set('gn', String(state.geometry.count));
+  params.set('gdup', boolStr(state.geometry.avoidDuplicates));
+  params.set('gseed', String(state.geometry.seed));
+
   return params;
 }
 
@@ -162,6 +175,17 @@ export function decodeState(search: string): AppState | null {
   state.fraction.avoidDuplicates = boolOr(params.get('fdup'), fallback.fraction.avoidDuplicates);
   state.fraction.seed = intOr(params.get('fseed'), fallback.fraction.seed);
 
+  state.geometry.shape = decodeGeometryShape(params.get('gshape'), fallback.geometry.shape);
+  state.geometry.measure = decodeGeometryMeasure(params.get('gmeasure'), fallback.geometry.measure);
+  state.geometry.sideRange = {
+    min: intOr(params.get('gmin'), fallback.geometry.sideRange.min),
+    max: intOr(params.get('gmax'), fallback.geometry.sideRange.max),
+  };
+  state.geometry.showUnits = boolOr(params.get('gunits'), fallback.geometry.showUnits);
+  state.geometry.count = intOr(params.get('gn'), fallback.geometry.count);
+  state.geometry.avoidDuplicates = boolOr(params.get('gdup'), fallback.geometry.avoidDuplicates);
+  state.geometry.seed = intOr(params.get('gseed'), fallback.geometry.seed);
+
   return state;
 }
 
@@ -228,6 +252,21 @@ function decodeFractionDirection(
 ): FractionDirectionMode {
   return raw !== null && (FRACTION_DIRECTIONS as readonly string[]).includes(raw)
     ? (raw as FractionDirectionMode)
+    : fallback;
+}
+
+function decodeGeometryShape(raw: string | null, fallback: GeometryShapeMode): GeometryShapeMode {
+  return raw !== null && (GEOMETRY_SHAPES as readonly string[]).includes(raw)
+    ? (raw as GeometryShapeMode)
+    : fallback;
+}
+
+function decodeGeometryMeasure(
+  raw: string | null,
+  fallback: GeometryMeasureMode,
+): GeometryMeasureMode {
+  return raw !== null && (GEOMETRY_MEASURES as readonly string[]).includes(raw)
+    ? (raw as GeometryMeasureMode)
     : fallback;
 }
 

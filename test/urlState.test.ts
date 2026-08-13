@@ -34,6 +34,7 @@ describe('encodeState / decodeState', () => {
       },
       clock: createDefaultState().clock,
       fraction: createDefaultState().fraction,
+      geometry: createDefaultState().geometry,
       document: {
         header: { title: 'Läxa vecka 3', showName: false, showDate: true, instructions: '' },
         fontSizePt: 20,
@@ -71,6 +72,7 @@ describe('encodeState / decodeState', () => {
       },
       clock: createDefaultState().clock,
       fraction: createDefaultState().fraction,
+      geometry: createDefaultState().geometry,
       document: {
         header: { title: 'Läxa vecka 3', showName: false, showDate: true, instructions: '' },
         fontSizePt: 20,
@@ -219,6 +221,49 @@ describe('encodeState / decodeState', () => {
       const state = createDefaultState();
       state.sheetType = 'clock';
       state.clock.seed = 111;
+      state.generator.seed = 222;
+      expect(toDocumentConfig(state).seed).toBe(111);
+    });
+  });
+
+  describe('geometriblad', () => {
+    it('en avkodad standardkonfiguration för geometriblad återskapar exakt samma AppState', () => {
+      const state = createDefaultState();
+      state.sheetType = 'geometry';
+      const decoded = decodeState(`?${encodeState(state).toString()}`);
+      expect(decoded).toEqual(state);
+    });
+
+    it('kodar och avkodar alla geometriinställningar genom en tur-och-retur', () => {
+      const state = createDefaultState();
+      state.sheetType = 'geometry';
+      state.geometry = {
+        shape: 'triangle',
+        measure: 'perimeter',
+        sideRange: { min: 3, max: 15 },
+        showUnits: false,
+        count: 24,
+        avoidDuplicates: false,
+        seed: 555,
+      };
+
+      const decoded = decodeState(`?${encodeState(state).toString()}`);
+      expect(decoded?.geometry).toEqual(state.geometry);
+      expect(decoded?.sheetType).toBe('geometry');
+    });
+
+    it('faller tillbaka till standardvärden för skräpvärden i geometrifälten', () => {
+      const fallback = createDefaultState();
+      const decoded = decodeState('?add=0:10&gshape=kub&gmeasure=volym&gmin=abc');
+      expect(decoded?.geometry.shape).toBe(fallback.geometry.shape);
+      expect(decoded?.geometry.measure).toBe(fallback.geometry.measure);
+      expect(decoded?.geometry.sideRange.min).toBe(fallback.geometry.sideRange.min);
+    });
+
+    it('sätter footer-seeden från geometry.seed när sheetType är "geometry"', () => {
+      const state = createDefaultState();
+      state.sheetType = 'geometry';
+      state.geometry.seed = 111;
       state.generator.seed = 222;
       expect(toDocumentConfig(state).seed).toBe(111);
     });
