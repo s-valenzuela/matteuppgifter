@@ -1,6 +1,7 @@
 import { clockPoolSize } from './clock';
 import type {
   ClockGeneratorConfig,
+  ClockStep,
   GeneratorConfig,
   Operation,
   OperationConfig,
@@ -74,17 +75,24 @@ export function validateClockConfig(input: ClockGeneratorConfig): ClockValidatio
     warnings.push('Antalet uppgifter justerades till ett positivt heltal.');
   }
 
+  // Ingen ikryssad grupp går inte att generera uppgifter ifrån — faller
+  // tillbaka till "Hel timme" i stället för en tom uppgiftslista.
+  const steps: ClockStep[] = input.steps.length > 0 ? input.steps : ['hour'];
+  if (steps !== input.steps) {
+    warnings.push('Minst en tidsgrupp måste vara ikryssad — "Hel timme" valdes automatiskt.');
+  }
+
   if (input.avoidDuplicates && count > 0) {
-    const poolSize = clockPoolSize(input.step);
+    const poolSize = clockPoolSize(steps);
     if (poolSize < count) {
       warnings.push(
-        `Det valda steget rymmer bara ${poolSize} unika klockslag, men ${count} efterfrågas — ` +
+        `De ikryssade grupperna rymmer bara ${poolSize} unika klockslag, men ${count} efterfrågas — ` +
           'uppgifter kommer att upprepas.',
       );
     }
   }
 
-  return { config: { ...input, count }, warnings };
+  return { config: { ...input, steps, count }, warnings };
 }
 
 function normalizeOperationConfig(config: OperationConfig): OperationConfig {

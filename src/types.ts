@@ -77,18 +77,13 @@ export interface DocumentConfig {
 export type SheetType = 'arithmetic' | 'clock';
 
 /**
- * Hur finmaskigt minuterna väljs. 'hour' ger bara hela timmar, 'five' alla 12
- * femminuterssteg — se core/clock.ts för den svenska frastabellen.
+ * Ett kryssbart minutmärke för klockuppgifter — flera kan vara påslagna
+ * samtidigt (se ui/form.ts), och den slutgiltiga minutpoolen är unionen av
+ * alla påslagna gruppers minuter. Grupperna är disjunkta så att ingen
+ * kombination av kryssrutor ger dubbletter: hour=[0], half=[30],
+ * quarter=[15,45], five=[5,10,20,25,35,40,50,55] — se core/clock.ts.
  */
 export type ClockStep = 'hour' | 'half' | 'quarter' | 'five';
-
-/**
- * :20 och :40 har två fullt korrekta svenska varianter. 'halv' använder samma
- * halv-ankare som :25/:35 ("tio i halv fyra"/"tio över halv fyra"), 'over-i'
- * den enklare över/i-formen ("tjugo över tre"/"tjugo i fyra"). Påverkar bara
- * dessa två minuter — resten av frastabellen är entydig.
- */
-export type TwentyFortyPhrasing = 'halv' | 'over-i';
 
 /** 'read' — läs av en urtavla med visare, skriv tiden i ord. 'draw' — given
  * tid i ord, rita visarna på en tom urtavla. 'digital' — läs av en urtavla
@@ -107,8 +102,9 @@ export interface ClockProblem {
 }
 
 export interface ClockGeneratorConfig {
-  step: ClockStep;
-  twentyFortyPhrasing: TwentyFortyPhrasing;
+  /** Minst en grupp bör vara ikryssad — validateClockConfig faller tillbaka
+   * till ['hour'] och varnar annars, se core/validate.ts. */
+  steps: ClockStep[];
   direction: ClockDirectionMode;
   showNumerals: boolean;
   showMinuteTicks: boolean;

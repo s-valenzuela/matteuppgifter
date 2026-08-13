@@ -5,8 +5,7 @@ import { baseConfig, opConfig } from './helpers';
 
 function baseClockConfig(overrides: Partial<ClockGeneratorConfig> = {}): ClockGeneratorConfig {
   return {
-    step: 'five',
-    twentyFortyPhrasing: 'halv',
+    steps: ['hour', 'half', 'quarter', 'five'],
     direction: 'read',
     showNumerals: true,
     showMinuteTicks: false,
@@ -117,20 +116,28 @@ describe('validateClockConfig', () => {
     expect(warnings.some((w) => w.includes('Antalet uppgifter'))).toBe(true);
   });
 
-  it('varnar när avoidDuplicates inte kan tillgodoses av det valda steget', () => {
-    const { warnings } = validateClockConfig(baseClockConfig({ step: 'hour', count: 30 }));
+  it('varnar när avoidDuplicates inte kan tillgodoses av de ikryssade grupperna', () => {
+    const { warnings } = validateClockConfig(baseClockConfig({ steps: ['hour'], count: 30 }));
     expect(warnings.some((w) => w.includes('12 unika klockslag'))).toBe(true);
   });
 
-  it('varnar inte när steget rymmer tillräckligt många unika klockslag', () => {
-    const { warnings } = validateClockConfig(baseClockConfig({ step: 'five', count: 30 }));
+  it('varnar inte när de ikryssade grupperna rymmer tillräckligt många unika klockslag', () => {
+    const { warnings } = validateClockConfig(
+      baseClockConfig({ steps: ['hour', 'half', 'quarter', 'five'], count: 30 }),
+    );
     expect(warnings).toHaveLength(0);
   });
 
   it('varnar inte när avoidDuplicates är avstängt, oavsett antal', () => {
     const { warnings } = validateClockConfig(
-      baseClockConfig({ step: 'hour', count: 100, avoidDuplicates: false }),
+      baseClockConfig({ steps: ['hour'], count: 100, avoidDuplicates: false }),
     );
     expect(warnings).toHaveLength(0);
+  });
+
+  it('faller tillbaka till "hour" och varnar när inga grupper är ikryssade', () => {
+    const { config, warnings } = validateClockConfig(baseClockConfig({ steps: [] }));
+    expect(config.steps).toEqual(['hour']);
+    expect(warnings.some((w) => w.includes('tidsgrupp'))).toBe(true);
   });
 });

@@ -5,7 +5,6 @@ import type {
   DocumentLayout,
   Operation,
   SheetType,
-  TwentyFortyPhrasing,
 } from '../types';
 import { LEVEL_PRESETS } from './presets';
 import type { AppState } from './state';
@@ -19,11 +18,13 @@ const OPERATION_LABELS: Record<Operation, string> = {
 
 const OPERATION_KEYS: readonly Operation[] = ['add', 'sub', 'mul', 'div'];
 
+const CLOCK_STEP_KEYS: readonly ClockStep[] = ['hour', 'half', 'quarter', 'five'];
+
 const CLOCK_STEP_LABELS: Record<ClockStep, string> = {
-  hour: 'Hel timme',
-  half: 'Hel och halv',
-  quarter: 'Kvart (hel, kvart, halv, kvart i)',
-  five: 'Var femte minut',
+  hour: 'Hel timme (:00)',
+  half: 'Halv (:30)',
+  quarter: 'Kvart (:15, :45)',
+  five: 'Fem minuter (:05, :10, :20, :25, :35, :40, :50, :55)',
 };
 
 const CLOCK_DIRECTION_LABELS: Record<ClockDirectionMode, string> = {
@@ -64,7 +65,6 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const missingNumberField = q<HTMLElement>(container, '#missingNumber-field');
   const shuffleField = q<HTMLElement>(container, '#shuffle-field');
   const clockSection = q<HTMLElement>(container, '#clock-section');
-  const clockPhrasingField = q<HTMLElement>(container, '#clock-phrasing-field');
 
   const operationEls = new Map(
     OPERATION_KEYS.map((key) => [
@@ -83,8 +83,9 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const mulTables = q<HTMLInputElement>(container, '#op-mul-tables');
   const divAllowRemainder = q<HTMLInputElement>(container, '#op-div-allowRemainder');
 
-  const clockStepEl = q<HTMLSelectElement>(container, '#clock-step');
-  const clockPhrasingEl = q<HTMLSelectElement>(container, '#clock-phrasing');
+  const clockStepEls = new Map(
+    CLOCK_STEP_KEYS.map((key) => [key, q<HTMLInputElement>(container, `#clock-step-${key}`)]),
+  );
   const clockDirectionEl = q<HTMLSelectElement>(container, '#clock-direction');
   const clockShowNumeralsEl = q<HTMLInputElement>(container, '#clock-showNumerals');
   const clockShowMinuteTicksEl = q<HTMLInputElement>(container, '#clock-showMinuteTicks');
@@ -141,9 +142,9 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     mulTables.value = state.generator.operations.mul.tables?.join(',') ?? '';
     divAllowRemainder.checked = state.generator.operations.div.allowRemainder ?? false;
 
-    clockStepEl.value = state.clock.step;
-    clockPhrasingEl.value = state.clock.twentyFortyPhrasing;
-    clockPhrasingField.hidden = state.clock.step !== 'five';
+    for (const [key, el] of clockStepEls) {
+      el.checked = state.clock.steps.includes(key);
+    }
     clockDirectionEl.value = state.clock.direction;
     clockShowNumeralsEl.checked = state.clock.showNumerals;
     clockShowMinuteTicksEl.checked = state.clock.showMinuteTicks;
@@ -253,15 +254,14 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     });
   }
 
-  clockStepEl.addEventListener('change', () => {
-    state.clock.step = clockStepEl.value as ClockStep;
-    refreshFromState();
-    emitChange();
-  });
-  clockPhrasingEl.addEventListener('change', () => {
-    state.clock.twentyFortyPhrasing = clockPhrasingEl.value as TwentyFortyPhrasing;
-    emitChange();
-  });
+  for (const [key, el] of clockStepEls) {
+    el.addEventListener('change', () => {
+      state.clock.steps = el.checked
+        ? [...state.clock.steps, key]
+        : state.clock.steps.filter((s) => s !== key);
+      emitChange();
+    });
+  }
   clockDirectionEl.addEventListener('change', () => {
     state.clock.direction = clockDirectionEl.value as ClockDirectionMode;
     emitChange();
@@ -431,9 +431,10 @@ function renderTemplate(): string {
       `<button type="button" data-min="${min}" data-max="${max}">${label}</button>`,
   ).join('');
 
-  const clockStepOptions = (Object.entries(CLOCK_STEP_LABELS) as [ClockStep, string][])
-    .map(([value, label]) => `<option value="${value}">${label}</option>`)
-    .join('');
+  const clockStepCheckboxes = CLOCK_STEP_KEYS.map(
+    (key) =>
+      `<label><input type="checkbox" id="clock-step-${key}" /> ${CLOCK_STEP_LABELS[key]}</label>`,
+  ).join('');
   const clockDirectionOptions = (
     Object.entries(CLOCK_DIRECTION_LABELS) as [ClockDirectionMode, string][]
   )
@@ -476,16 +477,11 @@ function renderTemplate(): string {
 
     <section aria-labelledby="clock-heading" id="clock-section">
       <h2 id="clock-heading">Klockan</h2>
+      <div class="field-grid" id="clock-steps">
+        <span class="level-chips-label">Minuter:</span>
+        ${clockStepCheckboxes}
+      </div>
       <div class="field-grid">
-        <label>Steg
-          <select id="clock-step">${clockStepOptions}</select>
-        </label>
-        <label id="clock-phrasing-field">Fras för :20 och :40
-          <select id="clock-phrasing">
-            <option value="halv">tio i halv / tio över halv</option>
-            <option value="over-i">tjugo över / tjugo i</option>
-          </select>
-        </label>
         <label>Riktning
           <select id="clock-direction">${clockDirectionOptions}</select>
         </label>

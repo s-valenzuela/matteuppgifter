@@ -7,7 +7,6 @@ import type {
   OperationConfig,
   Range,
   SheetType,
-  TwentyFortyPhrasing,
 } from '../types';
 import { createDefaultState, type AppState } from '../ui/state';
 
@@ -16,7 +15,6 @@ const ANSWER_STYLES: readonly AnswerStyle[] = ['blank', 'line', 'box'];
 const DOCUMENT_LAYOUTS: readonly DocumentLayout[] = ['grid', 'vertical'];
 const SHEET_TYPES: readonly SheetType[] = ['arithmetic', 'clock'];
 const CLOCK_STEPS: readonly ClockStep[] = ['hour', 'half', 'quarter', 'five'];
-const CLOCK_PHRASINGS: readonly TwentyFortyPhrasing[] = ['halv', 'over-i'];
 const CLOCK_DIRECTIONS: readonly ClockDirectionMode[] = ['read', 'draw', 'digital', 'mixed'];
 
 /**
@@ -62,8 +60,7 @@ export function encodeState(state: AppState): URLSearchParams {
   params.set('name', boolStr(state.document.header.showName));
   params.set('date', boolStr(state.document.header.showDate));
 
-  params.set('cstep', state.clock.step);
-  params.set('cphr', state.clock.twentyFortyPhrasing);
+  params.set('cstep', state.clock.steps.join(','));
   params.set('cdir', state.clock.direction);
   params.set('cnum', boolStr(state.clock.showNumerals));
   params.set('cticks', boolStr(state.clock.showMinuteTicks));
@@ -111,11 +108,7 @@ export function decodeState(search: string): AppState | null {
   state.document.header.showName = boolOr(params.get('name'), fallback.document.header.showName);
   state.document.header.showDate = boolOr(params.get('date'), fallback.document.header.showDate);
 
-  state.clock.step = decodeClockStep(params.get('cstep'), fallback.clock.step);
-  state.clock.twentyFortyPhrasing = decodeClockPhrasing(
-    params.get('cphr'),
-    fallback.clock.twentyFortyPhrasing,
-  );
+  state.clock.steps = decodeClockSteps(params.get('cstep'), fallback.clock.steps);
   state.clock.direction = decodeClockDirection(params.get('cdir'), fallback.clock.direction);
   state.clock.showNumerals = boolOr(params.get('cnum'), fallback.clock.showNumerals);
   state.clock.showMinuteTicks = boolOr(params.get('cticks'), fallback.clock.showMinuteTicks);
@@ -132,19 +125,16 @@ function decodeSheetType(raw: string | null, fallback: SheetType): SheetType {
     : fallback;
 }
 
-function decodeClockStep(raw: string | null, fallback: ClockStep): ClockStep {
-  return raw !== null && (CLOCK_STEPS as readonly string[]).includes(raw)
-    ? (raw as ClockStep)
-    : fallback;
-}
-
-function decodeClockPhrasing(
-  raw: string | null,
-  fallback: TwentyFortyPhrasing,
-): TwentyFortyPhrasing {
-  return raw !== null && (CLOCK_PHRASINGS as readonly string[]).includes(raw)
-    ? (raw as TwentyFortyPhrasing)
-    : fallback;
+/** Kommaseparerad lista av ikryssade minutgrupper, t.ex. "hour,half". En tom
+ * eller helt ogiltig lista faller tillbaka i sin helhet, precis som övriga
+ * fält — annars skulle en manipulerad länk kunna ge en klockuppgift utan
+ * någon giltig minutgrupp alls. */
+function decodeClockSteps(raw: string | null, fallback: ClockStep[]): ClockStep[] {
+  if (raw === null) return fallback;
+  const steps = raw
+    .split(',')
+    .filter((part): part is ClockStep => (CLOCK_STEPS as readonly string[]).includes(part));
+  return steps.length > 0 ? steps : fallback;
 }
 
 function decodeClockDirection(

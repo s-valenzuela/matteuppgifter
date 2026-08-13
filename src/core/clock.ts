@@ -4,7 +4,6 @@ import type {
   ClockGeneratorConfig,
   ClockProblem,
   ClockStep,
-  TwentyFortyPhrasing,
 } from '../types';
 import { mulberry32, pick, randomInt, type Rng } from './rng';
 
@@ -28,16 +27,29 @@ const HOUR_WORDS = [
   'tolv',
 ];
 
+/** Disjunkta minutgrupper — varje minut hör hemma i exakt en grupp, så att
+ * ingen kombination av ikryssade grupper kan ge en dubblett i unionen. */
 const STEP_MINUTES: Record<ClockStep, readonly number[]> = {
   hour: [0],
-  half: [0, 30],
-  quarter: [0, 15, 30, 45],
-  five: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55],
+  half: [30],
+  quarter: [15, 45],
+  five: [5, 10, 20, 25, 35, 40, 50, 55],
 };
 
-/** Hur många unika (timme, minut)-par ett steg rymmer — 12 timmar × antal minutsteg. */
-export function clockPoolSize(step: ClockStep): number {
-  return 12 * STEP_MINUTES[step].length;
+/** Unionen av minuterna för alla ikryssade grupper, sorterad. */
+export function minutesForSteps(steps: readonly ClockStep[]): number[] {
+  const minutes = new Set<number>();
+  for (const step of steps) {
+    for (const minute of STEP_MINUTES[step]) {
+      minutes.add(minute);
+    }
+  }
+  return [...minutes].sort((a, b) => a - b);
+}
+
+/** Hur många unika (timme, minut)-par de ikryssade grupperna rymmer — 12 timmar × antal minuter. */
+export function clockPoolSize(steps: readonly ClockStep[]): number {
+  return 12 * minutesForSteps(steps).length;
 }
 
 /**
@@ -47,7 +59,7 @@ export function clockPoolSize(step: ClockStep): number {
  * klassiska fällan i svensk klocka och exakt det den här tabellen är till för
  * att få rätt, se test/clock.test.ts för alla 144 femminuterstider.
  */
-export function clockPhrase(hour: number, minute: number, phrasing: TwentyFortyPhrasing): string {
+export function clockPhrase(hour: number, minute: number): string {
   const h = ((((hour - 1) % 12) + 12) % 12) + 1; // normalisera till 1–12
   const next = (h % 12) + 1;
   const hourWord = HOUR_WORDS[h];
@@ -63,7 +75,7 @@ export function clockPhrase(hour: number, minute: number, phrasing: TwentyFortyP
     case 15:
       return `kvart över ${hourWord}`;
     case 20:
-      return phrasing === 'halv' ? `tio i halv ${nextWord}` : `tjugo över ${hourWord}`;
+      return `tjugo över ${hourWord}`;
     case 25:
       return `fem i halv ${nextWord}`;
     case 30:
@@ -71,7 +83,7 @@ export function clockPhrase(hour: number, minute: number, phrasing: TwentyFortyP
     case 35:
       return `fem över halv ${nextWord}`;
     case 40:
-      return phrasing === 'halv' ? `tio över halv ${nextWord}` : `tjugo i ${nextWord}`;
+      return `tjugo i ${nextWord}`;
     case 45:
       return `kvart i ${nextWord}`;
     case 50:
@@ -84,12 +96,12 @@ export function clockPhrase(hour: number, minute: number, phrasing: TwentyFortyP
 }
 
 export function generateClockProblems(config: ClockGeneratorConfig): ClockProblem[] {
-  if (config.count <= 0) {
+  const minutes = minutesForSteps(config.steps);
+  if (config.count <= 0 || minutes.length === 0) {
     return [];
   }
 
   const rng = mulberry32(config.seed);
-  const minutes = STEP_MINUTES[config.step];
   const seen = config.avoidDuplicates ? new Set<string>() : undefined;
 
   const problems: ClockProblem[] = [];
