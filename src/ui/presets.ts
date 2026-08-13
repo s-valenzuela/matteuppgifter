@@ -62,7 +62,7 @@ export const PRESETS: Preset[] = [
     build: () => {
       const state = createDefaultState();
       state.sheetType = 'clock';
-      state.clock.step = 'half';
+      state.clock.steps = ['hour', 'half'];
       state.document.header.title = 'Klockan — hel och halv';
       return state;
     },
@@ -73,19 +73,18 @@ export const PRESETS: Preset[] = [
     build: () => {
       const state = createDefaultState();
       state.sheetType = 'clock';
-      state.clock.step = 'quarter';
+      state.clock.steps = ['hour', 'half', 'quarter'];
       state.document.header.title = 'Klockan — kvart';
       return state;
     },
   },
   {
     id: 'clock-five',
-    label: 'Klockan fem i halv',
+    label: 'Klockan alla minuter',
     build: () => {
       const state = createDefaultState();
       state.sheetType = 'clock';
-      state.clock.step = 'five';
-      state.clock.twentyFortyPhrasing = 'halv';
+      state.clock.steps = ['hour', 'half', 'quarter', 'five'];
       state.document.header.title = 'Klockan — alla minuter';
       return state;
     },

@@ -12,8 +12,7 @@ import { baseConfig, opConfig } from './helpers';
 
 function baseClockConfig(overrides: Partial<ClockGeneratorConfig> = {}): ClockGeneratorConfig {
   return {
-    step: 'five',
-    twentyFortyPhrasing: 'halv',
+    steps: ['hour', 'half', 'quarter', 'five'],
     direction: 'read',
     showNumerals: true,
     showMinuteTicks: false,
@@ -238,7 +237,6 @@ describe('renderProblemsToPdf', () => {
 describe('renderClockSheetToPdf', () => {
   function clockOptions(overrides: Partial<ClockDocumentOptions> = {}): ClockDocumentOptions {
     return {
-      twentyFortyPhrasing: 'halv',
       showNumerals: true,
       showMinuteTicks: false,
       ...overrides,
@@ -292,11 +290,13 @@ describe('renderClockSheetToPdf', () => {
     expect(withKey.getNumberOfPages()).toBe(layout.pageCount * 2);
   });
 
-  it('fungerar för alla riktningar, svarsstilar och steg, med facit, utan att kasta fel', () => {
+  it('fungerar för alla riktningar, svarsstilar och minutgrupper, med facit, utan att kasta fel', () => {
     for (const direction of ['read', 'draw', 'digital', 'mixed'] as const) {
       for (const answerStyle of ['blank', 'line', 'box'] as const) {
-        for (const step of ['hour', 'half', 'quarter', 'five'] as const) {
-          const problems = generateClockProblems(baseClockConfig({ direction, step, count: 20 }));
+        for (const steps of [['hour'], ['half'], ['quarter'], ['five']] as const) {
+          const problems = generateClockProblems(
+            baseClockConfig({ direction, steps: [...steps], count: 20 }),
+          );
           const doc = renderClockSheetToPdf(
             problems,
             baseDocumentConfig({ answerStyle, includeAnswerKey: true }),

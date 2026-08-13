@@ -56,6 +56,6 @@ describe('saveState / loadState', () => {
     const loaded = loadState();
     expect(loaded?.sheetType).toBe('arithmetic');
     expect(loaded?.clock).toBeDefined();
-    expect(loaded?.clock.step).toBe(createDefaultState().clock.step);
+    expect(loaded?.clock.steps).toEqual(createDefaultState().clock.steps);
   });
 });

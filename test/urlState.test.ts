@@ -177,8 +177,7 @@ describe('encodeState / decodeState', () => {
       const state = createDefaultState();
       state.sheetType = 'clock';
       state.clock = {
-        step: 'five',
-        twentyFortyPhrasing: 'over-i',
+        steps: ['half', 'five'],
         direction: 'mixed',
         showNumerals: false,
         showMinuteTicks: true,

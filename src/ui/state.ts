@@ -68,8 +68,7 @@ export function createDefaultState(): AppState {
 
 function createDefaultClockConfig(): ClockGeneratorConfig {
   return {
-    step: 'quarter',
-    twentyFortyPhrasing: 'halv',
+    steps: ['hour', 'half', 'quarter'],
     direction: 'read',
     showNumerals: true,
     showMinuteTicks: false,

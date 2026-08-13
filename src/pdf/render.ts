@@ -365,10 +365,7 @@ function drawVerticalProblem(
 
 /** Den del av ClockGeneratorConfig som faktiskt behövs för att RITA ett
  * klockblad — count/avoidDuplicates/seed styr bara genereringen, se core/clock.ts. */
-export type ClockDocumentOptions = Pick<
-  ClockGeneratorConfig,
-  'twentyFortyPhrasing' | 'showNumerals' | 'showMinuteTicks'
->;
+export type ClockDocumentOptions = Pick<ClockGeneratorConfig, 'showNumerals' | 'showMinuteTicks'>;
 
 /**
  * Klockblad delar sidhuvud/sidfot och sidbrytningslogik med
@@ -485,7 +482,7 @@ function drawClockProblem(
   if (problem.direction === 'draw') {
     // Frasen ÄR uppgiften här (urtavlan saknar visare) — samma text i både
     // uppgift och facit, bara urtavlans visare skiljer dem åt.
-    const phrase = clockPhrase(problem.hour, problem.minute, clockOptions.twentyFortyPhrasing);
+    const phrase = clockPhrase(problem.hour, problem.minute);
     drawFittedCenteredClockLabel(
       doc,
       phrase,
@@ -515,7 +512,7 @@ function drawClockProblem(
 
   // direction === 'read'
   if (showAnswers) {
-    const phrase = clockPhrase(problem.hour, problem.minute, clockOptions.twentyFortyPhrasing);
+    const phrase = clockPhrase(problem.hour, problem.minute);
     drawFittedCenteredClockLabel(
       doc,
       `Klockan är ${phrase}.`,
