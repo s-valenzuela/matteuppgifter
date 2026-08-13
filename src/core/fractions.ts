@@ -77,6 +77,13 @@ function resolveShape(mode: FractionShapeMode, rng: Rng): FractionShape {
   return mode === 'mixed' ? pick(rng, ['circle', 'bar']) : mode;
 }
 
+/** 'mixed' slumpar bara mellan de figurbaserade riktningarna — 'toPercent'
+ * saknar figur helt och har därför en annan, tätare sidlayout
+ * ('fractionText' i layout.ts). Att blanda in 'toPercent' bland de andra
+ * skulle antingen slösa bort dess vinst (om sidan ändå reserverar plats för
+ * en figur som ibland inte ritas) eller kräva per-uppgift-layout, som
+ * layout.ts inte stödjer (en sida har en enda layoutMode) — se
+ * renderFractionSheetToPdf. */
 function resolveDirection(mode: FractionDirectionMode, rng: Rng): FractionDirection {
-  return mode === 'mixed' ? pick(rng, ['identify', 'shade']) : mode;
+  return mode === 'mixed' ? pick(rng, ['identify', 'shade', 'identifyPercent']) : mode;
 }

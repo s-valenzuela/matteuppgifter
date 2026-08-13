@@ -130,12 +130,28 @@ describe('generateFractionProblems', () => {
     }
   });
 
-  it('ger båda riktningarna när direction är "mixed"', () => {
+  it('ger alltid direction "identifyPercent" när direction är "identifyPercent"', () => {
+    for (const p of generateFractionProblems(
+      fractionConfig({ direction: 'identifyPercent', count: 40 }),
+    )) {
+      expect(p.direction).toBe('identifyPercent');
+    }
+  });
+
+  it('ger alltid direction "toPercent" när direction är "toPercent"', () => {
+    for (const p of generateFractionProblems(
+      fractionConfig({ direction: 'toPercent', count: 40 }),
+    )) {
+      expect(p.direction).toBe('toPercent');
+    }
+  });
+
+  it('ger de tre figurbaserade riktningarna (inte "toPercent") när direction är "mixed"', () => {
     const directions = new Set(
       generateFractionProblems(fractionConfig({ direction: 'mixed', count: 40, seed: 7 })).map(
         (p) => p.direction,
       ),
     );
-    expect(directions).toEqual(new Set(['identify', 'shade']));
+    expect(directions).toEqual(new Set(['identify', 'shade', 'identifyPercent']));
   });
 });

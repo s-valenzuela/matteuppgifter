@@ -16,6 +16,7 @@ import {
   CLOCK_FACE_LABEL_GAP_MM,
   computeGridLayout,
   FRACTION_BLANK_STACK_GAP_MM,
+  fractionStackReachAboveMm,
   FRACTION_SHAPE_LABEL_GAP_MM,
   MM_PER_PT,
   VERTICAL_BOX_GAP_FACTOR,
@@ -668,8 +669,12 @@ function drawClockDigitalPrompt(
  */
 /** Den del av FractionGeneratorConfig som faktiskt behövs för att RITA ett
  * bråkblad — count/avoidDuplicates/seed styr bara genereringen, se
- * core/fractions.ts. Samma mönster som ClockDocumentOptions. */
-export type FractionDocumentOptions = Pick<FractionGeneratorConfig, 'showPercent'>;
+ * core/fractions.ts. `direction` behövs (utöver per-uppgift på
+ * FractionProblem) för att avgöra vilken layoutMode hela sidan ska använda
+ * INNAN uppgifterna finns, se renderFractionSheetToPdf — 'toPercent' saknar
+ * figur och använder 'fractionText' i stället för 'fraction'. Samma mönster
+ * som ClockDocumentOptions i övrigt. */
+export type FractionDocumentOptions = Pick<FractionGeneratorConfig, 'showPercent' | 'direction'>;
 
 export function renderFractionSheetToPdf(
   problems: FractionProblem[],
@@ -677,11 +682,16 @@ export function renderFractionSheetToPdf(
   fractionOptions: FractionDocumentOptions,
 ): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  // 'toPercent' slumpas aldrig fram av 'mixed' (se resolveDirection i
+  // core/fractions.ts), så om den valts är den den ENDA riktningen på hela
+  // sidan — annars är 'fraction' alltid rätt, oavsett om enskilda uppgifter
+  // råkar bli 'identify'/'shade'/'identifyPercent' via 'mixed'.
+  const layoutMode = fractionOptions.direction === 'toPercent' ? 'fractionText' : 'fraction';
   const layout = computeGridLayout({
     problemCount: problems.length,
     fontSizePt: config.fontSizePt,
     columns: config.columns,
-    layout: 'fraction',
+    layout: layoutMode,
   });
 
   if (layout.pageCount === 0) {
@@ -752,19 +762,24 @@ function drawFractionProblem(
   fractionOptions: FractionDocumentOptions,
   showAnswers: boolean,
 ): void {
+  if (problem.direction === 'toPercent') {
+    drawFractionToPercentProblem(doc, problem, position, layout, config, showAnswers);
+    return;
+  }
+
   const size = layout.fractionSizeMm!;
   const centerX = position.xMm + layout.columnWidthMm / 2;
 
   const isShadeDirection = problem.direction === 'shade';
   const shaded = showAnswers || !isShadeDirection;
-  // Samma max(text, tom ruta)-tal som layout.ts reserverat radhöjd
-  // utifrån (se computeGridLayout) — annars kan figuren hamna högre eller
-  // lägre än den plats som faktiskt är avsatt åt den.
-  const stackReachAboveMm = Math.max(
-    config.fontSizePt * MM_PER_PT * (1 + VERTICAL_LINE_STEP_FACTOR),
-    FRACTION_BLANK_STACK_GAP_MM + FRACTION_BLANK_BOX_REACH_ABOVE_MM,
-  );
-  const topY = position.yMm - FRACTION_SHAPE_LABEL_GAP_MM - stackReachAboveMm - size;
+  // Samma tal som layout.ts reserverat radhöjd utifrån (se
+  // computeGridLayout) — annars kan figuren hamna högre eller lägre än den
+  // plats som faktiskt är avsatt åt den.
+  const topY =
+    position.yMm -
+    FRACTION_SHAPE_LABEL_GAP_MM -
+    fractionStackReachAboveMm(config.fontSizePt * MM_PER_PT) -
+    size;
 
   drawFractionShape(
     doc,
@@ -776,6 +791,21 @@ function drawFractionProblem(
     problem.denominator,
     shaded,
   );
+
+  if (problem.direction === 'identifyPercent') {
+    // Som 'identify', men svaret är bråkets andel i procent i stället för
+    // bråket självt — se drawFractionIdentifyPercentAnswer.
+    drawFractionIdentifyPercentAnswer(
+      doc,
+      problem,
+      centerX,
+      position.yMm,
+      config.answerStyle,
+      config.fontSizePt,
+      showAnswers,
+    );
+    return;
+  }
 
   if (isShadeDirection || showAnswers) {
     // 'shade': det givna bråket står kvar oförändrat i både uppgift och
@@ -789,7 +819,7 @@ function drawFractionProblem(
       String(problem.denominator),
       config.fontSizePt,
       fractionOptions.showPercent
-        ? formatFractionPercent(problem.numerator, problem.denominator)
+        ? { text: formatFractionPercent(problem.numerator, problem.denominator) }
         : undefined,
       layout.columnWidthMm,
     );
@@ -798,6 +828,76 @@ function drawFractionProblem(
 
   // 'identify', innan facit — figuren är svaret, eleven fyller i täljare/nämnare.
   drawStackedFractionBlank(doc, centerX, position.yMm, config.answerStyle, config.fontSizePt);
+}
+
+/**
+ * 'toPercent' — helt utan figur (se resolveDirection i core/fractions.ts):
+ * bråket ritas uppställt precis som facit/"shade" alltid gör, och eleven
+ * skriver om det till procent till höger om strecket i stället för att
+ * läsa av en färglagd figur. Radhöjden är layoutMode 'fractionText' i
+ * layout.ts — samma stapelhöjd som 'fraction' men utan figurens utrymme.
+ */
+function drawFractionToPercentProblem(
+  doc: jsPDF,
+  problem: FractionProblem,
+  position: CellPosition,
+  layout: GridLayout,
+  config: DocumentConfig,
+  showAnswers: boolean,
+): void {
+  const centerX = position.xMm + layout.columnWidthMm / 2;
+  drawStackedFractionText(
+    doc,
+    centerX,
+    position.yMm,
+    String(problem.numerator),
+    String(problem.denominator),
+    config.fontSizePt,
+    showAnswers
+      ? { text: formatFractionPercent(problem.numerator, problem.denominator) }
+      : { answerStyle: config.answerStyle },
+    layout.columnWidthMm,
+  );
+}
+
+/**
+ * 'identifyPercent' — samma centrerade plats under figuren som
+ * drawStackedFractionBlank/-Text använder för bråket, men EN rad (procent)
+ * i stället för två staplade (täljare/nämnare). "%"-tecknet skrivs alltid
+ * ut bredvid tomrummet (även innan facit) så att eleven vet vilken enhet
+ * som förväntas, samma princip som klockans "__:__"-platshållare.
+ */
+function drawFractionIdentifyPercentAnswer(
+  doc: jsPDF,
+  problem: FractionProblem,
+  centerX: number,
+  baselineY: number,
+  answerStyle: DocumentConfig['answerStyle'],
+  fontSizePt: number,
+  showAnswers: boolean,
+): void {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(fontSizePt);
+
+  if (showAnswers) {
+    doc.text(formatFractionPercent(problem.numerator, problem.denominator), centerX, baselineY, {
+      align: 'center',
+    });
+    return;
+  }
+
+  const suffix = ' %';
+  const blankWidth =
+    answerStyle === 'box'
+      ? BOX_SIZE_MM
+      : answerStyle === 'line'
+        ? LINE_LENGTH_MM
+        : doc.getTextWidth(FRACTION_BLANK_PLACEHOLDER);
+  const suffixWidth = doc.getTextWidth(suffix);
+  const blankCenterX = centerX - suffixWidth / 2;
+
+  drawCenteredBlank(doc, blankCenterX, baselineY, answerStyle);
+  doc.text(suffix, blankCenterX + blankWidth / 2, baselineY);
 }
 
 /**
@@ -889,6 +989,12 @@ function computeFractionBlankStackYs(baselineY: number): FractionStackYs {
  * princip som CLOCK_LABEL_MAX_WIDTH_MARGIN_MM. */
 const FRACTION_PERCENT_MARGIN_MM = 2;
 
+/** Vad som (om något) ska stå till höger om bråkstrecket — kända siffror
+ * (facit, eller "shade"-uppgiftens givna procent) eller en tomruta att
+ * fylla i (obesvarad "toPercent"). undefined = inget alls (t.ex. "Visa
+ * procent" avstängt för identify/shade), se drawFractionProblem. */
+type FractionPercentSuffix = { text: string } | { answerStyle: DocumentConfig['answerStyle'] };
+
 function drawStackedFractionText(
   doc: jsPDF,
   centerX: number,
@@ -896,7 +1002,7 @@ function drawStackedFractionText(
   numeratorText: string,
   denominatorText: string,
   fontSizePt: number,
-  percentText?: string,
+  percentSuffix?: FractionPercentSuffix,
   columnWidthMm?: number,
 ): void {
   doc.setFont('helvetica', 'normal');
@@ -911,15 +1017,26 @@ function drawStackedFractionText(
     FRACTION_RULE_PADDING_MM;
   doc.line(centerX - ruleHalfWidth, ruleY, centerX + ruleHalfWidth, ruleY);
 
-  if (percentText !== undefined) {
+  if (percentSuffix === undefined) return;
+
+  if ('text' in percentSuffix) {
     drawFractionPercentSuffix(
       doc,
       centerX,
       ruleHalfWidth,
       ruleY,
-      percentText,
+      percentSuffix.text,
       fontSizePt,
       columnWidthMm,
+    );
+  } else {
+    drawFractionPercentBlankSuffix(
+      doc,
+      centerX,
+      ruleHalfWidth,
+      ruleY,
+      percentSuffix.answerStyle,
+      fontSizePt,
     );
   }
 }
@@ -957,6 +1074,42 @@ function drawFractionPercentSuffix(
   // Baslinjen sänks en bit under strecket så texten optiskt centreras kring
   // det, i stället för att sitta ovanpå det.
   doc.text(suffix, startX, ruleY + basePt * MM_PER_PT * 0.32);
+}
+
+/**
+ * Tomrum i stället för procentsiffrorna (drawFractionPercentSuffix), i
+ * väntan på facit — "toPercent" innan facit. Samma tre svarsstilar som
+ * resten av dokumentet, positionerat på samma plats till höger om
+ * bråkstrecket, med " %" skrivet ut direkt efter tomrummet så att eleven vet
+ * vilken enhet som förväntas (samma princip som klockans "__:__").
+ */
+function drawFractionPercentBlankSuffix(
+  doc: jsPDF,
+  centerX: number,
+  ruleHalfWidth: number,
+  ruleY: number,
+  answerStyle: DocumentConfig['answerStyle'],
+  fontSizePt: number,
+): void {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(fontSizePt);
+  const baselineY = ruleY + fontSizePt * MM_PER_PT * 0.32;
+
+  const prefix = ' = ';
+  const startX = centerX + ruleHalfWidth;
+  doc.text(prefix, startX, baselineY);
+  const prefixWidth = doc.getTextWidth(prefix);
+
+  const blankWidth =
+    answerStyle === 'box'
+      ? BOX_SIZE_MM
+      : answerStyle === 'line'
+        ? LINE_LENGTH_MM
+        : doc.getTextWidth(FRACTION_BLANK_PLACEHOLDER);
+  const blankCenterX = startX + prefixWidth + blankWidth / 2;
+  drawCenteredBlank(doc, blankCenterX, baselineY, answerStyle);
+
+  doc.text(' %', blankCenterX + blankWidth / 2, baselineY);
 }
 
 function drawStackedFractionBlank(

@@ -351,6 +351,7 @@ describe('renderFractionSheetToPdf', () => {
   ): FractionDocumentOptions {
     return {
       showPercent: false,
+      direction: 'identify',
       ...overrides,
     };
   }
@@ -406,8 +407,8 @@ describe('renderFractionSheetToPdf', () => {
     expect(withKey.getNumberOfPages()).toBe(layout.pageCount * 2);
   });
 
-  it('fungerar för alla riktningar, former, svarsstilar, nämnare och procentvisning, med facit, utan att kasta fel', () => {
-    for (const direction of ['identify', 'shade', 'mixed'] as const) {
+  it('fungerar för alla figurbaserade riktningar, former, svarsstilar, nämnare och procentvisning, med facit, utan att kasta fel', () => {
+    for (const direction of ['identify', 'shade', 'identifyPercent', 'mixed'] as const) {
       for (const shape of ['circle', 'bar', 'mixed'] as const) {
         for (const answerStyle of ['blank', 'line', 'box'] as const) {
           for (const showPercent of [true, false]) {
@@ -418,7 +419,7 @@ describe('renderFractionSheetToPdf', () => {
               const doc = renderFractionSheetToPdf(
                 problems,
                 baseDocumentConfig({ answerStyle, includeAnswerKey: true }),
-                fractionOptions({ showPercent }),
+                fractionOptions({ showPercent, direction }),
               );
               expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
             }
@@ -426,5 +427,43 @@ describe('renderFractionSheetToPdf', () => {
         }
       }
     }
+  });
+
+  describe('"toPercent" (utan figur)', () => {
+    it('fungerar för alla svarsstilar och nämnare, med facit, utan att kasta fel', () => {
+      for (const answerStyle of ['blank', 'line', 'box'] as const) {
+        for (const denominators of [[2], [3], [4], [5, 6], [8, 10, 12]]) {
+          const problems = generateFractionProblems(
+            baseFractionConfig({ direction: 'toPercent', denominators, count: 20 }),
+          );
+          const doc = renderFractionSheetToPdf(
+            problems,
+            baseDocumentConfig({ answerStyle, includeAnswerKey: true }),
+            fractionOptions({ direction: 'toPercent' }),
+          );
+          expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+        }
+      }
+    });
+
+    it('använder layoutMode "fractionText" (tätare, ingen figur reserverad)', () => {
+      const problems = generateFractionProblems(
+        baseFractionConfig({ direction: 'toPercent', count: 60, avoidDuplicates: false }),
+      );
+      const config = baseDocumentConfig({ columns: 3, fontSizePt: 14 });
+      const layout = computeGridLayout({
+        problemCount: problems.length,
+        fontSizePt: config.fontSizePt,
+        columns: config.columns,
+        layout: 'fractionText',
+      });
+
+      const doc = renderFractionSheetToPdf(
+        problems,
+        config,
+        fractionOptions({ direction: 'toPercent' }),
+      );
+      expect(doc.getNumberOfPages()).toBe(layout.pageCount);
+    });
   });
 });
