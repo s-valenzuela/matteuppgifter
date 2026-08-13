@@ -91,8 +91,9 @@ export type ClockStep = 'hour' | 'half' | 'quarter' | 'five';
 export type TwentyFortyPhrasing = 'halv' | 'over-i';
 
 /** 'read' — läs av en urtavla med visare, skriv tiden i ord. 'draw' — given
- * tid i ord, rita visarna på en tom urtavla. */
-export type ClockDirection = 'read' | 'draw';
+ * tid i ord, rita visarna på en tom urtavla. 'digital' — läs av en urtavla
+ * med visare, skriv tiden digitalt (t.ex. "06:30") i stället för i ord. */
+export type ClockDirection = 'read' | 'draw' | 'digital';
 
 /** 'mixed' slumpar riktning per uppgift, se core/clock.ts. */
 export type ClockDirectionMode = ClockDirection | 'mixed';

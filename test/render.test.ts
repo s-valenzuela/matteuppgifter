@@ -293,7 +293,7 @@ describe('renderClockSheetToPdf', () => {
   });
 
   it('fungerar för alla riktningar, svarsstilar och steg, med facit, utan att kasta fel', () => {
-    for (const direction of ['read', 'draw', 'mixed'] as const) {
+    for (const direction of ['read', 'draw', 'digital', 'mixed'] as const) {
       for (const answerStyle of ['blank', 'line', 'box'] as const) {
         for (const step of ['hour', 'half', 'quarter', 'five'] as const) {
           const problems = generateClockProblems(baseClockConfig({ direction, step, count: 20 }));

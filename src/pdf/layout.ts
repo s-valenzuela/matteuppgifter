@@ -81,9 +81,9 @@ const VERTICAL_ROW_EXTRA_GAP_FACTOR =
  * kolumnbredden (se resolveColumns/computeGridLayout). Skalar med
  * textstorleken så att "större text" också ger större, lättlästa urtavlor.
  */
-const CLOCK_DIAMETER_FONT_FACTOR = 3.4;
-const CLOCK_DIAMETER_MIN_MM = 18;
-const CLOCK_DIAMETER_MAX_MM = 45;
+const CLOCK_DIAMETER_FONT_FACTOR = 7;
+const CLOCK_DIAMETER_MIN_MM = 16;
+const CLOCK_DIAMETER_MAX_MM = 60;
 /** Luft runt urtavlan i kolumnbredden, respektive mellan kolumner. */
 const CLOCK_COLUMN_GUTTER_MM = 6;
 /**
@@ -162,7 +162,7 @@ export function computeGridLayout(input: GridLayoutInput): GridLayout {
     layoutMode === 'clock'
       ? clamp(
           Math.min(targetClockDiameterMm, columnWidthMm - CLOCK_COLUMN_GUTTER_MM),
-          10,
+          CLOCK_DIAMETER_MIN_MM,
           CLOCK_DIAMETER_MAX_MM,
         )
       : undefined;

@@ -29,6 +29,7 @@ const CLOCK_STEP_LABELS: Record<ClockStep, string> = {
 const CLOCK_DIRECTION_LABELS: Record<ClockDirectionMode, string> = {
   read: 'Läs av klockan (skriv tiden i ord)',
   draw: 'Rita visarna (given tid i ord)',
+  digital: 'Läs av klockan (skriv tiden digitalt, t.ex. 06:30)',
   mixed: 'Blandat',
 };
 

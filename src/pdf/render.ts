@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { clockPhrase } from '../core/clock';
+import { clockPhrase, digitalTime } from '../core/clock';
 import type { ClockGeneratorConfig, ClockProblem, DocumentConfig, Problem } from '../types';
 import { computeOperandDigitCounts, formatAnswer, OPERATION_SYMBOLS } from './format';
 import { drawClockFace } from './clockFace';
@@ -472,8 +472,9 @@ function drawClockProblem(
   // Facit visar alltid visarna på urtavlan, oavsett riktning — annars går
   // "Rita visarna"-uppgifterna inte att kontrollera mot ett facit. I den
   // vanliga (icke-facit) sidan saknas visarna bara för 'draw', där det är
-  // själva poängen att eleven ritar dem för hand.
-  const showHands = showAnswers || problem.direction === 'read';
+  // själva poängen att eleven ritar dem för hand — 'read' och 'digital'
+  // utgår båda från en synlig urtavla, bara svarsformatet skiljer dem åt.
+  const showHands = showAnswers || problem.direction !== 'draw';
   drawClockFace(doc, faceCenterX, faceCenterY, radius, {
     hour: showHands ? problem.hour : undefined,
     minute: showHands ? problem.minute : undefined,
@@ -481,11 +482,10 @@ function drawClockProblem(
     showMinuteTicks: clockOptions.showMinuteTicks,
   });
 
-  const phrase = clockPhrase(problem.hour, problem.minute, clockOptions.twentyFortyPhrasing);
-
   if (problem.direction === 'draw') {
     // Frasen ÄR uppgiften här (urtavlan saknar visare) — samma text i både
     // uppgift och facit, bara urtavlans visare skiljer dem åt.
+    const phrase = clockPhrase(problem.hour, problem.minute, clockOptions.twentyFortyPhrasing);
     drawFittedCenteredClockLabel(
       doc,
       phrase,
@@ -497,7 +497,25 @@ function drawClockProblem(
     return;
   }
 
+  if (problem.direction === 'digital') {
+    if (showAnswers) {
+      drawFittedCenteredClockLabel(
+        doc,
+        digitalTime(problem.hour, problem.minute),
+        faceCenterX,
+        position.yMm,
+        maxLabelWidthMm,
+        config.fontSizePt,
+      );
+      return;
+    }
+    drawClockDigitalPrompt(doc, faceCenterX, position.yMm, config.answerStyle, config.fontSizePt);
+    return;
+  }
+
+  // direction === 'read'
   if (showAnswers) {
+    const phrase = clockPhrase(problem.hour, problem.minute, clockOptions.twentyFortyPhrasing);
     drawFittedCenteredClockLabel(
       doc,
       `Klockan är ${phrase}.`,
@@ -597,5 +615,35 @@ function drawClockReadPrompt(
     case 'box':
       doc.rect(blankStartX, baselineY - BOX_SIZE_MM + 2, BOX_SIZE_MM, BOX_SIZE_MM);
       break;
+  }
+}
+
+/** "__:__" — inget prefix behövs (till skillnad från "Klockan är"-prompten)
+ * eftersom en digital tomruta läses av sig själv, precis som på en riktig
+ * digitalklocka. Bredden är i praktiken alltid liten nog att den aldrig
+ * behöver krympas, men går genom samma fit-funktion för konsekvensens skull. */
+const DIGITAL_BLANK_PLACEHOLDER = '__:__';
+
+function drawClockDigitalPrompt(
+  doc: jsPDF,
+  centerX: number,
+  baselineY: number,
+  answerStyle: DocumentConfig['answerStyle'],
+  basePt: number,
+): void {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(basePt);
+
+  if (answerStyle === 'blank') {
+    doc.text(DIGITAL_BLANK_PLACEHOLDER, centerX, baselineY, { align: 'center' });
+    return;
+  }
+
+  const widthMm = answerStyle === 'line' ? LINE_LENGTH_MM : BOX_SIZE_MM;
+  const startX = centerX - widthMm / 2;
+  if (answerStyle === 'line') {
+    doc.line(startX, baselineY + 1, startX + widthMm, baselineY + 1);
+  } else {
+    doc.rect(startX, baselineY - BOX_SIZE_MM + 2, BOX_SIZE_MM, BOX_SIZE_MM);
   }
 }

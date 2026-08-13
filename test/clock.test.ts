@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clockPhrase, clockPoolSize, generateClockProblems } from '../src/core/clock';
+import { clockPhrase, clockPoolSize, digitalTime, generateClockProblems } from '../src/core/clock';
 import type { ClockGeneratorConfig } from '../src/types';
 
 function clockConfig(overrides: Partial<ClockGeneratorConfig> = {}): ClockGeneratorConfig {
@@ -178,12 +178,26 @@ describe('generateClockProblems', () => {
     }
   });
 
-  it('ger båda riktningarna när direction är "mixed"', () => {
+  it('ger alltid direction "digital" när direction är "digital"', () => {
+    for (const p of generateClockProblems(clockConfig({ direction: 'digital', count: 40 }))) {
+      expect(p.direction).toBe('digital');
+    }
+  });
+
+  it('ger alla tre riktningarna när direction är "mixed"', () => {
     const directions = new Set(
       generateClockProblems(clockConfig({ direction: 'mixed', count: 40, seed: 7 })).map(
         (p) => p.direction,
       ),
     );
-    expect(directions.size).toBe(2);
+    expect(directions).toEqual(new Set(['read', 'draw', 'digital']));
+  });
+});
+
+describe('digitalTime', () => {
+  it('nollutfyller timme och minut som en digitalklocka', () => {
+    expect(digitalTime(6, 30)).toBe('06:30');
+    expect(digitalTime(12, 5)).toBe('12:05');
+    expect(digitalTime(9, 0)).toBe('09:00');
   });
 });
