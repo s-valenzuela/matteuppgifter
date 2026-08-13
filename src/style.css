@@ -264,6 +264,14 @@ label {
   display: block;
 }
 
+/* En <label> med dolt-attributet ska faktiskt döljas — annars vinner regeln
+ * ovan (display: block) över webbläsarens inbyggda [hidden]-stil, vilket
+ * annars läcker t.ex. "Saknat tal" och "Uppställning" synliga när Klockan är
+ * vald som bladtyp trots att formEl.hidden sätts till true i form.ts. */
+label[hidden] {
+  display: none;
+}
+
 input[type='text'],
 input[type='number'] {
   width: 100%;
