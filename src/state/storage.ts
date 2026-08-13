@@ -1,6 +1,12 @@
+import type { SheetType } from '../types';
 import { createDefaultState, type AppState } from '../ui/state';
 
 const STORAGE_KEY = 'matteuppgifter:state:v1';
+
+/** Nyckeln bumpas medvetet INTE när nya fält tillkommer — normalizeState
+ * nedan fyller på det som saknas, så användarens sparade inställningar
+ * överlever i stället för att kastas bort vid varje ny funktion. */
+const SHEET_TYPES: readonly SheetType[] = ['arithmetic', 'clock', 'fraction'];
 
 /**
  * Läser senast sparade AppState från localStorage. Skyddad med try/catch
@@ -20,23 +26,31 @@ export function loadState(): AppState | null {
 }
 
 /**
- * Fyller på sheetType/clock/fraction för ett tillstånd sparat innan
- * respektive bladtyp fanns — isAppState() nedan är en medvetet ytlig
- * kontroll som INTE känner av dessa fält, så ett äldre sparat tillstånd
- * passar igenom den och skulle annars komma tillbaka med clock/fraction som
- * undefined.
+ * Fyller på fält som inte fanns när tillståndet sparades — isAppState() nedan
+ * är en medvetet ytlig kontroll som INTE känner av dem, så ett äldre sparat
+ * tillstånd passar igenom den och skulle annars komma tillbaka med de nyare
+ * fälten som undefined.
+ *
+ * Gäller både hela bladtyper (clock/fraction lades till efter räknesätten)
+ * OCH enskilda fält inuti `document` — därför slås `document` och dess
+ * `header` ihop med standardvärdena i stället för att skickas vidare rakt av.
+ * Ett tillstånd sparat innan header.instructions fanns gav annars
+ * `instructions: undefined`, vilket i sin tur skrev ut den bokstavliga texten
+ * "undefined" i formuläret och på bladet (och kastade TypeError i
+ * headerExtraLineCount, som anropar .trim() på fältet).
  */
 function normalizeState(state: AppState): AppState {
   const fallback = createDefaultState();
   return {
-    sheetType:
-      state.sheetType === 'clock' || state.sheetType === 'fraction'
-        ? state.sheetType
-        : 'arithmetic',
+    sheetType: SHEET_TYPES.includes(state.sheetType) ? state.sheetType : 'arithmetic',
     generator: state.generator,
     clock: state.clock ?? fallback.clock,
     fraction: state.fraction ?? fallback.fraction,
-    document: state.document,
+    document: {
+      ...fallback.document,
+      ...state.document,
+      header: { ...fallback.document.header, ...state.document.header },
+    },
   };
 }
 

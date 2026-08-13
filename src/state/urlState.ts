@@ -134,7 +134,10 @@ export function decodeState(search: string): AppState | null {
   state.document.header.title = params.get('title') ?? fallback.document.header.title;
   state.document.header.showName = boolOr(params.get('name'), fallback.document.header.showName);
   state.document.header.showDate = boolOr(params.get('date'), fallback.document.header.showDate);
-  state.document.header.instructions = params.get('instr') ?? fallback.document.header.instructions;
+  state.document.header.instructions = decodeInstructions(
+    params.get('instr'),
+    fallback.document.header.instructions,
+  );
   state.document.exampleFirst = boolOr(params.get('example'), fallback.document.exampleFirst);
 
   state.clock.steps = decodeClockSteps(params.get('cstep'), fallback.clock.steps);
@@ -160,6 +163,20 @@ export function decodeState(search: string): AppState | null {
   state.fraction.seed = intOr(params.get('fseed'), fallback.fraction.seed);
 
   return state;
+}
+
+/**
+ * Instruktionstexten är fri text, så nästan vad som helst är ett giltigt
+ * värde — utom de två strängar som bara kan ha uppstått av misstag.
+ * `params.set('instr', undefined)` skriver den bokstavliga texten
+ * "undefined" i URL:en, vilket hände för tillstånd sparade innan fältet
+ * fanns (se normalizeState i state/storage.ts). Själva orsaken är åtgärdad,
+ * men länkar som redan delats under tiden ska inte skriva ut "undefined" som
+ * instruktion på bladet — de städas därför upp här vid inläsning.
+ */
+function decodeInstructions(raw: string | null, fallback: string): string {
+  if (raw === null) return fallback;
+  return raw === 'undefined' || raw === 'null' ? '' : raw;
 }
 
 function decodeSheetType(raw: string | null, fallback: SheetType): SheetType {

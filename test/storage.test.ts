@@ -58,4 +58,35 @@ describe('saveState / loadState', () => {
     expect(loaded?.clock).toBeDefined();
     expect(loaded?.clock.steps).toEqual(createDefaultState().clock.steps);
   });
+
+  it('fyller på nyare document-fält för ett tillstånd sparat innan de fanns', () => {
+    // Samma klass av problem som klock-testet ovan, men ETT STEG NER: fälten
+    // saknas inuti `document`/`document.header`, inte på toppnivån. Ett
+    // tillstånd sparat innan instructions/exampleFirst fanns gav annars
+    // `instructions: undefined`, vilket skrev ut den bokstavliga texten
+    // "undefined" i formuläret och i bladets sidhuvud.
+    const legacyState = createDefaultState();
+    // @ts-expect-error simulerar JSON sparat innan header.instructions fanns
+    delete legacyState.document.header.instructions;
+    // @ts-expect-error se ovan
+    delete legacyState.document.exampleFirst;
+    localStorage.setItem('matteuppgifter:state:v1', JSON.stringify(legacyState));
+
+    const loaded = loadState();
+    expect(loaded?.document.header.instructions).toBe('');
+    expect(loaded?.document.exampleFirst).toBe(false);
+    // Fälten som FANNS ska inte skrivas över av standardvärdena.
+    expect(loaded?.document.header.title).toBe(legacyState.document.header.title);
+  });
+
+  it('behåller egna document-värden som skiljer sig från standardvärdena', () => {
+    const state = createDefaultState();
+    state.document.header.title = 'Läxa vecka 7';
+    state.document.header.instructions = 'Rita visarna.';
+    state.document.exampleFirst = true;
+    state.document.fontSizePt = 20;
+    saveState(state);
+
+    expect(loadState()).toEqual(state);
+  });
 });

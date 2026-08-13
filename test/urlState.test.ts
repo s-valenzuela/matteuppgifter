@@ -157,6 +157,26 @@ describe('encodeState / decodeState', () => {
     expect(decoded?.generator.operations.add.resultRange).toBeUndefined();
   });
 
+  it('städar upp den bokstavliga texten "undefined" som instruktion i redan delade länkar', () => {
+    // params.set('instr', undefined) skrev "instr=undefined" i URL:en för
+    // tillstånd sparade innan fältet fanns — se decodeInstructions.
+    expect(decodeState('?add=0:10&instr=undefined')?.document.header.instructions).toBe('');
+    expect(decodeState('?add=0:10&instr=null')?.document.header.instructions).toBe('');
+    // En instruktion som bara RÅKAR innehålla ordet ska förstås inte tömmas.
+    expect(
+      decodeState('?add=0:10&instr=Skriv+undefined+h%C3%A4r')?.document.header.instructions,
+    ).toBe('Skriv undefined här');
+  });
+
+  it('kodar och avkodar instruktion och "löst exempel" genom en tur-och-retur', () => {
+    const state = createDefaultState();
+    state.document.header.instructions = 'Rita visarna.';
+    state.document.exampleFirst = true;
+    const decoded = decodeState(`?${encodeState(state).toString()}`);
+    expect(decoded?.document.header.instructions).toBe('Rita visarna.');
+    expect(decoded?.document.exampleFirst).toBe(true);
+  });
+
   it('kodar och avkodar "Saknat tal"-läget', () => {
     const state = createDefaultState();
     state.generator.missingNumber = true;
