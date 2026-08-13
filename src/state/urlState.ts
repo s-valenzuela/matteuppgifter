@@ -82,6 +82,7 @@ export function encodeState(state: AppState): URLSearchParams {
   params.set('fdenom', state.fraction.denominators.join(','));
   params.set('fshape', state.fraction.shape);
   params.set('fdir', state.fraction.direction);
+  params.set('fpct', boolStr(state.fraction.showPercent));
   params.set('fn', String(state.fraction.count));
   params.set('fdup', boolStr(state.fraction.avoidDuplicates));
   params.set('fseed', String(state.fraction.seed));
@@ -143,6 +144,7 @@ export function decodeState(search: string): AppState | null {
     params.get('fdir'),
     fallback.fraction.direction,
   );
+  state.fraction.showPercent = boolOr(params.get('fpct'), fallback.fraction.showPercent);
   state.fraction.count = intOr(params.get('fn'), fallback.fraction.count);
   state.fraction.avoidDuplicates = boolOr(params.get('fdup'), fallback.fraction.avoidDuplicates);
   state.fraction.seed = intOr(params.get('fseed'), fallback.fraction.seed);

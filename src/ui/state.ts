@@ -92,6 +92,7 @@ function createDefaultFractionConfig(): FractionGeneratorConfig {
     denominators: FRACTION_DENOMINATORS.filter((d) => d <= 4),
     shape: 'circle',
     direction: 'identify',
+    showPercent: false,
     count: 12,
     avoidDuplicates: true,
     seed: randomSeed(),

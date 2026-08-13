@@ -148,6 +148,10 @@ export interface FractionGeneratorConfig {
   denominators: number[];
   shape: FractionShapeMode;
   direction: FractionDirectionMode;
+  /** Visa bråkets procentvärde (avrundat till närmaste heltal, med "≈" om
+   * det inte går jämnt upp) bredvid bråket, varhelst det skrivs ut som
+   * siffror — se drawStackedFractionText i pdf/render.ts. */
+  showPercent: boolean;
   /** Totalt antal uppgifter att generera. */
   count: number;
   /** Undvik dubbletter (samma form, täljare och nämnare) så länge poolen räcker till. */

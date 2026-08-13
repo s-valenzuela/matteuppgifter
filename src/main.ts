@@ -75,7 +75,7 @@ function regenerate(state: AppState): void {
     const { config, warnings } = validateFractionConfig(state.fraction);
     renderWarnings(warnings);
     preview.update(() =>
-      renderFractionSheetToPdf(generateFractionProblems(config), toDocumentConfig(state)),
+      renderFractionSheetToPdf(generateFractionProblems(config), toDocumentConfig(state), config),
     );
     return;
   }
@@ -106,7 +106,11 @@ function buildCurrentPdf(): jsPDF {
   }
   if (state.sheetType === 'fraction') {
     const { config } = validateFractionConfig(state.fraction);
-    return renderFractionSheetToPdf(generateFractionProblems(config), toDocumentConfig(state));
+    return renderFractionSheetToPdf(
+      generateFractionProblems(config),
+      toDocumentConfig(state),
+      config,
+    );
   }
   const { config } = validateConfig(state.generator);
   return renderProblemsToPdf(generateProblems(config), toDocumentConfig(state));

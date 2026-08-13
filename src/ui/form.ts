@@ -112,6 +112,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   );
   const fractionShapeEl = q<HTMLSelectElement>(container, '#fraction-shape');
   const fractionDirectionEl = q<HTMLSelectElement>(container, '#fraction-direction');
+  const fractionShowPercentEl = q<HTMLInputElement>(container, '#fraction-showPercent');
 
   const countEl = q<HTMLInputElement>(container, '#count');
   const avoidDuplicatesEl = q<HTMLInputElement>(container, '#avoidDuplicates');
@@ -197,6 +198,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     }
     fractionShapeEl.value = state.fraction.shape;
     fractionDirectionEl.value = state.fraction.direction;
+    fractionShowPercentEl.checked = state.fraction.showPercent;
 
     const countable = activeCountable();
     countEl.value = String(countable.count);
@@ -221,7 +223,16 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   for (const radio of sheetTypeRadios) {
     radio.addEventListener('change', () => {
       if (radio.checked) {
+        const previousType = state.sheetType;
         state.sheetType = radio.value as SheetType;
+        // "Ruta" är ett naturligare standardval för bråk (en tydligt
+        // avgränsad plats att skriva täljare/nämnare i) än "Tomt streck",
+        // som är standard för räknesätt/klockan. Sätts bara vid en faktisk
+        // växling TILL bråk, inte varje gång formuläret laddas om, så att
+        // ett eget val av svarsstil inte skrivs över i onödan.
+        if (state.sheetType === 'fraction' && previousType !== 'fraction') {
+          state.document.answerStyle = 'box';
+        }
         refreshFromState();
         emitChange();
       }
@@ -337,6 +348,10 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   });
   fractionDirectionEl.addEventListener('change', () => {
     state.fraction.direction = fractionDirectionEl.value as FractionDirectionMode;
+    emitChange();
+  });
+  fractionShowPercentEl.addEventListener('change', () => {
+    state.fraction.showPercent = fractionShowPercentEl.checked;
     emitChange();
   });
 
@@ -574,6 +589,9 @@ function renderTemplate(): string {
           <select id="fraction-direction">${fractionDirectionOptions}</select>
         </label>
       </div>
+      <label>
+        <input type="checkbox" id="fraction-showPercent" /> Visa procent (t.ex. "= 75 %")
+      </label>
     </section>
 
     <section aria-labelledby="sheet-heading">
