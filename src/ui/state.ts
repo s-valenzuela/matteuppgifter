@@ -1,7 +1,9 @@
 import { FRACTION_DENOMINATORS } from '../core/fractions';
 import type {
+  ClockDirectionMode,
   ClockGeneratorConfig,
   DocumentConfig,
+  FractionDirectionMode,
   FractionGeneratorConfig,
   GeneratorConfig,
   OperationConfig,
@@ -65,14 +67,53 @@ export function createDefaultState(): AppState {
     clock: createDefaultClockConfig(),
     fraction: createDefaultFractionConfig(),
     document: {
-      header: { title: 'Matteuppgifter', showName: true, showDate: true },
+      header: { title: 'Matteuppgifter', showName: true, showDate: true, instructions: '' },
       fontSizePt: 14,
       columns: 3,
       layout: 'grid',
       answerStyle: 'blank',
       includeAnswerKey: true,
+      exampleFirst: false,
     },
   };
+}
+
+/** Instruktionstext per klockriktning — se DocumentHeader.instructions.
+ * 'mixed' saknar en enskild, rättvisande beskrivning eftersom riktningen
+ * varierar slumpmässigt per uppgift. */
+const CLOCK_INSTRUCTIONS: Record<ClockDirectionMode, string> = {
+  read: 'Läs av klockan och skriv tiden.',
+  draw: 'Rita visarna.',
+  digital: 'Läs av klockan och skriv tiden digitalt.',
+  digitalDraw: 'Rita visarna.',
+  mixed: '',
+};
+
+/** Instruktionstext per bråkriktning — se DocumentHeader.instructions. */
+const FRACTION_INSTRUCTIONS: Record<FractionDirectionMode, string> = {
+  identify: 'Skriv bråket.',
+  shade: 'Färglägg figuren.',
+  identifyPercent: 'Skriv hur många procent som är färglagt.',
+  toPercent: 'Skriv i procentform.',
+  mixed: '',
+};
+
+/**
+ * Ett vettigt standardvärde för header.instructions, beräknat utifrån
+ * bladtyp och (för klocka/bråk) vald riktning, eller (för räknesätt) om
+ * "Saknat tal" är påslaget. Anropas av ui/form.ts:s change-handlers när
+ * sheetType eller en riktning ändras — men bara för att SÄTTA fältet om
+ * användaren inte redan skrivit över det för hand, se refreshFromState.
+ */
+export function computeDefaultInstructions(state: AppState): string {
+  switch (state.sheetType) {
+    case 'arithmetic':
+      return state.generator.missingNumber ? 'Fyll i det som saknas.' : '';
+    case 'clock':
+      return CLOCK_INSTRUCTIONS[state.clock.direction];
+    case 'fraction':
+      return FRACTION_INSTRUCTIONS[state.fraction.direction];
+  }
 }
 
 function createDefaultClockConfig(): ClockGeneratorConfig {

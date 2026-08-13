@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { A4_METRICS, computeGridLayout } from '../src/pdf/layout';
+import {
+  A4_METRICS,
+  computeGridLayout,
+  computeHeaderHeightMm,
+  HEADER_EXTRA_LINE_MM,
+} from '../src/pdf/layout';
 
 describe('computeGridLayout', () => {
   it('returnerar noll sidor och tomma positioner för 0 uppgifter', () => {
@@ -272,6 +277,35 @@ describe('computeGridLayout', () => {
       });
       const expectedPageCount = Math.ceil(40 / layout.problemsPerPage);
       expect(layout.pageCount).toBe(expectedPageCount);
+    });
+  });
+
+  describe('computeHeaderHeightMm', () => {
+    it('ger tillbaka bashöjden oförändrad utan extra rader', () => {
+      expect(computeHeaderHeightMm(A4_METRICS.headerHeightMm, 0)).toBe(A4_METRICS.headerHeightMm);
+    });
+
+    it('lägger till exakt HEADER_EXTRA_LINE_MM per extra rad', () => {
+      expect(computeHeaderHeightMm(A4_METRICS.headerHeightMm, 1)).toBe(
+        A4_METRICS.headerHeightMm + HEADER_EXTRA_LINE_MM,
+      );
+      expect(computeHeaderHeightMm(A4_METRICS.headerHeightMm, 2)).toBe(
+        A4_METRICS.headerHeightMm + 2 * HEADER_EXTRA_LINE_MM,
+      );
+    });
+
+    it('en högre headerHeightMm via metrics ger mindre plats åt uppgifterna (färre rader per sida)', () => {
+      const normal = computeGridLayout({ problemCount: 1, fontSizePt: 14, columns: 3 });
+      const tallerHeader = computeGridLayout({
+        problemCount: 1,
+        fontSizePt: 14,
+        columns: 3,
+        metrics: {
+          ...A4_METRICS,
+          headerHeightMm: computeHeaderHeightMm(A4_METRICS.headerHeightMm, 2),
+        },
+      });
+      expect(tallerHeader.rowsPerPage).toBeLessThanOrEqual(normal.rowsPerPage);
     });
   });
 });

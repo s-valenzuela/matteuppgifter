@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { generateClockProblems } from '../src/core/clock';
 import { FRACTION_DENOMINATORS, generateFractionProblems } from '../src/core/fractions';
 import { generateProblems } from '../src/core/generate';
-import { computeGridLayout } from '../src/pdf/layout';
+import { A4_METRICS, computeGridLayout, computeHeaderHeightMm } from '../src/pdf/layout';
 import {
   renderClockSheetToPdf,
   renderFractionSheetToPdf,
@@ -47,12 +47,13 @@ function baseFractionConfig(
 
 function baseDocumentConfig(overrides: Partial<DocumentConfig> = {}): DocumentConfig {
   return {
-    header: { title: 'Matteuppgifter', showName: true, showDate: true },
+    header: { title: 'Matteuppgifter', showName: true, showDate: true, instructions: '' },
     fontSizePt: 14,
     columns: 'auto',
     layout: 'grid',
     answerStyle: 'blank',
     includeAnswerKey: false,
+    exampleFirst: false,
     seed: 1,
     ...overrides,
   };
@@ -465,5 +466,163 @@ describe('renderFractionSheetToPdf', () => {
       );
       expect(doc.getNumberOfPages()).toBe(layout.pageCount);
     });
+  });
+});
+
+describe('header.instructions och exampleFirst', () => {
+  it('en instruktionsrad gör sidhuvudet högre och kan därmed ge fler sidor, för alla tre bladtyperna', () => {
+    const arithmeticProblems = generateProblems(
+      baseConfig({
+        operations: {
+          add: opConfig({ enabled: true, operandRange: { min: 0, max: 100 } }),
+          sub: opConfig(),
+          mul: opConfig(),
+          div: opConfig(),
+        },
+        count: 200,
+      }),
+    );
+    const clockProblems = generateClockProblems(
+      baseClockConfig({ count: 200, avoidDuplicates: false }),
+    );
+    const fractionProblems = generateFractionProblems(
+      baseFractionConfig({ count: 200, avoidDuplicates: false }),
+    );
+
+    const cases: Array<{
+      layoutMode: 'grid' | 'clock' | 'fraction';
+      problemCount: number;
+      render: (config: DocumentConfig) => number;
+    }> = [
+      {
+        layoutMode: 'grid',
+        problemCount: arithmeticProblems.length,
+        render: (config) => renderProblemsToPdf(arithmeticProblems, config).getNumberOfPages(),
+      },
+      {
+        layoutMode: 'clock',
+        problemCount: clockProblems.length,
+        render: (config) =>
+          renderClockSheetToPdf(clockProblems, config, {
+            showNumerals: true,
+            showMinuteTicks: false,
+          }).getNumberOfPages(),
+      },
+      {
+        layoutMode: 'fraction',
+        problemCount: fractionProblems.length,
+        render: (config) =>
+          renderFractionSheetToPdf(fractionProblems, config, {
+            showPercent: false,
+            direction: 'identify',
+          }).getNumberOfPages(),
+      },
+    ];
+
+    for (const { layoutMode, problemCount, render } of cases) {
+      // exampleFirst kräver minst en uppgift för att lägga till en extra rad
+      // (se headerExtraLineCount i pdf/render.ts) — problemCount > 0 här.
+      const extraLineCount = 2; // instruktion + "löst exempel"-notis
+      const config = baseDocumentConfig({
+        columns: 3,
+        fontSizePt: 14,
+        header: {
+          title: 'Matteuppgifter',
+          showName: true,
+          showDate: true,
+          instructions: 'Räkna ut svaret.',
+        },
+        exampleFirst: true,
+      });
+
+      const expectedLayout = computeGridLayout({
+        problemCount,
+        fontSizePt: config.fontSizePt,
+        columns: config.columns,
+        layout: layoutMode,
+        metrics: {
+          ...A4_METRICS,
+          headerHeightMm: computeHeaderHeightMm(A4_METRICS.headerHeightMm, extraLineCount),
+        },
+      });
+      const layoutWithoutExtraLines = computeGridLayout({
+        problemCount,
+        fontSizePt: config.fontSizePt,
+        columns: config.columns,
+        layout: layoutMode,
+      });
+
+      expect(render(config)).toBe(expectedLayout.pageCount);
+      // Slår fast att testet faktiskt övar den växande header-höjden.
+      expect(expectedLayout.pageCount).toBeGreaterThanOrEqual(layoutWithoutExtraLines.pageCount);
+    }
+  });
+
+  it('exampleFirst löser den första uppgiften på uppgiftssidan utan att påverka facit-sidantalet, för alla tre bladtyperna', () => {
+    const arithmeticProblems = generateProblems(
+      baseConfig({
+        operations: {
+          add: opConfig({ enabled: true, operandRange: { min: 0, max: 20 } }),
+          sub: opConfig(),
+          mul: opConfig(),
+          div: opConfig(),
+        },
+        count: 12,
+      }),
+    );
+    const clockProblems = generateClockProblems(baseClockConfig({ count: 12 }));
+    const fractionProblems = generateFractionProblems(baseFractionConfig({ count: 9 }));
+
+    const config = baseDocumentConfig({
+      exampleFirst: true,
+      includeAnswerKey: true,
+      header: {
+        title: 'Matteuppgifter',
+        showName: true,
+        showDate: true,
+        instructions: 'Rita visarna.',
+      },
+    });
+
+    const arithmeticDoc = renderProblemsToPdf(arithmeticProblems, config);
+    const clockDoc = renderClockSheetToPdf(clockProblems, config, {
+      showNumerals: true,
+      showMinuteTicks: false,
+    });
+    const fractionDoc = renderFractionSheetToPdf(fractionProblems, config, {
+      showPercent: false,
+      direction: 'shade',
+    });
+
+    for (const doc of [arithmeticDoc, clockDoc, fractionDoc]) {
+      expect(doc.getNumberOfPages()).toBe(2);
+      expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+    }
+  });
+
+  it('fungerar utan att kasta fel när det inte finns några uppgifter, även med exampleFirst och en instruktionsrad', () => {
+    const config = baseDocumentConfig({
+      exampleFirst: true,
+      header: {
+        title: 'Matteuppgifter',
+        showName: true,
+        showDate: true,
+        instructions: 'Skriv i bråkform.',
+      },
+    });
+
+    expect(renderProblemsToPdf([], config).getNumberOfPages()).toBe(1);
+    expect(
+      renderClockSheetToPdf([], config, {
+        showNumerals: true,
+        showMinuteTicks: false,
+      }).getNumberOfPages(),
+    ).toBe(1);
+    expect(
+      renderFractionSheetToPdf([], config, {
+        showPercent: false,
+        direction: 'identify',
+      }).getNumberOfPages(),
+    ).toBe(1);
   });
 });

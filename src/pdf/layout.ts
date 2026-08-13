@@ -19,6 +19,24 @@ export const A4_METRICS: PageMetrics = {
   footerHeightMm: 8,
 };
 
+/** Extra höjd i sidhuvudet per extra textrad (instruktion, "löst
+ * exempel"-notis) utöver den vanliga titel+namn/datum-höjden — se
+ * drawHeader i render.ts, som skriver ut raderna med exakt samma
+ * radavstånd. */
+export const HEADER_EXTRA_LINE_MM = 6;
+
+/**
+ * Sidhuvudets totala höjd givet hur många extra rader (instruktion, "löst
+ * exempel"-notis) som faktiskt ska skrivas ut — annars krockar den sista
+ * extraraden med uppgifternas första rad. `baseHeaderHeightMm` är den
+ * vanliga höjden (normalt A4_METRICS.headerHeightMm, men tar emot värdet
+ * som parameter i stället för att hårdkoda konstanten så att ett anpassat
+ * metrics-objekt, t.ex. i tester, fortfarande respekteras).
+ */
+export function computeHeaderHeightMm(baseHeaderHeightMm: number, extraLineCount: number): number {
+  return baseHeaderHeightMm + extraLineCount * HEADER_EXTRA_LINE_MM;
+}
+
 /** Exporterad eftersom render.ts behöver samma mm/pt-omräkning för att
  * positionera raderna inom ett uppställningsblock (se drawVerticalProblem) —
  * annars kan de två filerna glida isär och rader börja överlappa. */

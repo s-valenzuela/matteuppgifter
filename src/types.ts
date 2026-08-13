@@ -59,6 +59,15 @@ export interface DocumentHeader {
   title: string;
   showName: boolean;
   showDate: boolean;
+  /**
+   * Instruktionstext till eleven, t.ex. "Rita visarna." eller "Skriv i
+   * bråkform." — skrivs ut i sidhuvudet på uppgiftssidan (inte facit), under
+   * namn/datum-fälten. Tom sträng = ingen rad skrivs ut. Fylls i med ett
+   * vettigt standardvärde automatiskt när bladtyp eller riktning ändras (se
+   * computeDefaultInstructions i ui/state.ts), men går att skriva över för
+   * hand.
+   */
+  instructions: string;
 }
 
 export interface DocumentConfig {
@@ -69,6 +78,14 @@ export interface DocumentConfig {
   answerStyle: AnswerStyle;
   /** Lägg till facit-sidor sist i dokumentet. */
   includeAnswerKey: boolean;
+  /**
+   * Löser den FÖRSTA uppgiften på uppgiftssidan redan i förväg, som ett
+   * löst exempel — resten av uppgiftssidan är opåverkad (facit visar redan
+   * alla uppgifter lösta, oavsett detta fält). En rad skrivs ut i
+   * sidhuvudet så att det är tydligt att uppgift 1 redan är löst, se
+   * drawHeader i pdf/render.ts.
+   */
+  exampleFirst: boolean;
   /** Visas i sidfoten så att bladet kan återskapas från samma GeneratorConfig. */
   seed: number;
 }
