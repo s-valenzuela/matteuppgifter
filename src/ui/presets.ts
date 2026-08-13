@@ -89,6 +89,32 @@ export const PRESETS: Preset[] = [
       return state;
     },
   },
+  {
+    id: 'fraction-circle',
+    label: 'Bråk cirkel',
+    build: () => {
+      const state = createDefaultState();
+      state.sheetType = 'fraction';
+      state.fraction.denominators = [2, 3, 4];
+      state.fraction.shape = 'circle';
+      state.fraction.direction = 'identify';
+      state.document.header.title = 'Bråk — cirkel';
+      return state;
+    },
+  },
+  {
+    id: 'fraction-shade',
+    label: 'Bråk färglägg',
+    build: () => {
+      const state = createDefaultState();
+      state.sheetType = 'fraction';
+      state.fraction.denominators = [2, 3, 4, 5, 6];
+      state.fraction.shape = 'mixed';
+      state.fraction.direction = 'shade';
+      state.document.header.title = 'Bråk — färglägg';
+      return state;
+    },
+  },
 ];
 
 /** Nivå-chips: sätter samma talområde på alla fyra räknesätt, oavsett om de är aktiverade. */

@@ -1,12 +1,21 @@
 import { jsPDF } from 'jspdf';
 import { clockPhrase, digitalTime } from '../core/clock';
-import type { ClockGeneratorConfig, ClockProblem, DocumentConfig, Problem } from '../types';
+import type {
+  ClockGeneratorConfig,
+  ClockProblem,
+  DocumentConfig,
+  FractionProblem,
+  Problem,
+} from '../types';
 import { computeOperandDigitCounts, formatAnswer, OPERATION_SYMBOLS } from './format';
 import { drawClockFace } from './clockFace';
+import { drawFractionShape } from './fractionShape';
 import {
   A4_METRICS,
   CLOCK_FACE_LABEL_GAP_MM,
   computeGridLayout,
+  FRACTION_BLANK_STACK_GAP_MM,
+  FRACTION_SHAPE_LABEL_GAP_MM,
   MM_PER_PT,
   VERTICAL_BOX_GAP_FACTOR,
   VERTICAL_BOX_HEIGHT_FACTOR,
@@ -648,5 +657,265 @@ function drawClockDigitalPrompt(
     doc.line(startX, baselineY + 1, startX + widthMm, baselineY + 1);
   } else {
     doc.rect(startX, baselineY - BOX_SIZE_MM + 2, BOX_SIZE_MM, BOX_SIZE_MM);
+  }
+}
+
+/**
+ * Bråkblad delar sidhuvud/sidfot och sidbrytningslogik med de andra
+ * renderXToPdf-funktionerna, men har ett eget uppgiftsformat (figur + ett
+ * riktigt uppställt bråk i stället för en textrad), se drawFractionProblem.
+ */
+export function renderFractionSheetToPdf(
+  problems: FractionProblem[],
+  config: DocumentConfig,
+): jsPDF {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const layout = computeGridLayout({
+    problemCount: problems.length,
+    fontSizePt: config.fontSizePt,
+    columns: config.columns,
+    layout: 'fraction',
+  });
+
+  if (layout.pageCount === 0) {
+    drawHeader(doc, config, null);
+    drawFooter(doc, 0, 1, config.seed);
+    return doc;
+  }
+
+  renderFractionSection(doc, problems, layout, config, { showAnswers: false, sectionLabel: null });
+
+  if (config.includeAnswerKey) {
+    doc.addPage();
+    renderFractionSection(doc, problems, layout, config, {
+      showAnswers: true,
+      sectionLabel: 'Facit',
+    });
+  }
+
+  return doc;
+}
+
+function renderFractionSection(
+  doc: jsPDF,
+  problems: FractionProblem[],
+  layout: GridLayout,
+  config: DocumentConfig,
+  options: SectionOptions,
+): void {
+  for (let page = 0; page < layout.pageCount; page++) {
+    if (page > 0) {
+      doc.addPage();
+    }
+    drawHeader(doc, config, options.sectionLabel);
+    for (const position of layout.positions) {
+      if (position.page === page) {
+        drawFractionProblem(
+          doc,
+          problems[position.index],
+          position,
+          layout,
+          config,
+          options.showAnswers,
+        );
+      }
+    }
+    drawFooter(doc, page, layout.pageCount, config.seed);
+  }
+}
+
+/**
+ * 'identify' — figuren visas alltid färglagd (annars finns inget att läsa
+ * av) och eleven skriver bråket; uppgiftssidan visar tomma, uppställda
+ * platser i stället för siffrorna. 'shade' — figuren är tom (outline) på
+ * uppgiftssidan och det givna bråket står under; facit färglägger figuren.
+ * Se motsvarande resonemang för 'read'/'draw' i drawClockProblem.
+ */
+function drawFractionProblem(
+  doc: jsPDF,
+  problem: FractionProblem,
+  position: CellPosition,
+  layout: GridLayout,
+  config: DocumentConfig,
+  showAnswers: boolean,
+): void {
+  const size = layout.fractionSizeMm!;
+  const centerX = position.xMm + layout.columnWidthMm / 2;
+
+  const isShadeDirection = problem.direction === 'shade';
+  const shaded = showAnswers || !isShadeDirection;
+  // Samma max(text, tom ruta)-tal som layout.ts reserverat radhöjd
+  // utifrån (se computeGridLayout) — annars kan figuren hamna högre eller
+  // lägre än den plats som faktiskt är avsatt åt den.
+  const stackReachAboveMm = Math.max(
+    config.fontSizePt * MM_PER_PT * (1 + VERTICAL_LINE_STEP_FACTOR),
+    FRACTION_BLANK_STACK_GAP_MM + FRACTION_BLANK_BOX_REACH_ABOVE_MM,
+  );
+  const topY = position.yMm - FRACTION_SHAPE_LABEL_GAP_MM - stackReachAboveMm - size;
+
+  drawFractionShape(
+    doc,
+    problem.shape,
+    centerX,
+    topY,
+    size,
+    problem.numerator,
+    problem.denominator,
+    shaded,
+  );
+
+  if (isShadeDirection || showAnswers) {
+    // 'shade': det givna bråket står kvar oförändrat i både uppgift och
+    // facit — bara figurens färgläggning skiljer dem åt. 'identify' i facit:
+    // samma plats visar nu det korrekta svaret i stället för tomma platser.
+    drawStackedFractionText(
+      doc,
+      centerX,
+      position.yMm,
+      String(problem.numerator),
+      String(problem.denominator),
+      config.fontSizePt,
+    );
+    return;
+  }
+
+  // 'identify', innan facit — figuren är svaret, eleven fyller i täljare/nämnare.
+  drawStackedFractionBlank(doc, centerX, position.yMm, config.answerStyle, config.fontSizePt);
+}
+
+/** Kortare än den vanliga BLANK_PLACEHOLDER — en täljare/nämnare är alltid
+ * en kort siffra, aldrig ett flercifrigt tal som behöver ett långt streck. */
+const FRACTION_BLANK_PLACEHOLDER = '__';
+/** BråkstrecKets bredd när det inte finns någon text att mäta upp mot
+ * (drawStackedFractionBlank) — samma bredd som en 'line'-tomruta. */
+const FRACTION_RULE_MIN_WIDTH_MM = LINE_LENGTH_MM;
+/** Luft mellan siffrornas bredd och bråkstreckets kant, per sida. */
+const FRACTION_RULE_PADDING_MM = 1.5;
+
+interface FractionStackYs {
+  numeratorY: number;
+  ruleY: number;
+  denominatorY: number;
+}
+
+/**
+ * Täljare/streck/nämnare staplas med exakt samma avstånd som en operand/rad i
+ * uppställningsläget (VERTICAL_LINE_STEP_FACTOR/VERTICAL_RULE_GAP_FACTOR) —
+ * samma geometri som layout.ts:s textskalade term reserverat radhöjd
+ * utifrån för layoutMode 'fraction' (se computeGridLayout). Används bara för
+ * KÄNDA siffror (facit/"shade"-uppgiften) — se computeFractionBlankStackYs
+ * för den obesvarade platshållarvarianten, som har en annan (fast) geometri.
+ */
+function computeFractionStackYs(baselineY: number, fontSizePt: number): FractionStackYs {
+  const fontSizeMm = fontSizePt * MM_PER_PT;
+  const denominatorY = baselineY;
+  const numeratorY = denominatorY - fontSizeMm * VERTICAL_LINE_STEP_FACTOR;
+  const ruleY = numeratorY + fontSizeMm * VERTICAL_RULE_GAP_FACTOR;
+  return { numeratorY, ruleY, denominatorY };
+}
+
+/** Rutans utsträckning ovanför sin baslinje, se drawCenteredBlank — samma
+ * "-2"-konvention som layout.ts:s FRACTION_BLANK_BOX_REACH_ABOVE_MM
+ * (hårdkodad separat där för att undvika ett cirkulärt beroende; håll de
+ * två i synk om BOX_SIZE_MM ändras). */
+const FRACTION_BLANK_BOX_REACH_ABOVE_MM = BOX_SIZE_MM - 2;
+/**
+ * Var strecket sitter, mm ovanför täljarens plats — mitt emellan täljarens
+ * ruta (som sträcker sig FRACTION_BLANK_BOX_REACH_ABOVE_MM − 2 mm NEDANFÖR
+ * täljarens plats, se drawCenteredBlanks 'box'-fall) och nämnarens ruta (som
+ * på motsvarande sätt sträcker sig FRACTION_BLANK_BOX_REACH_ABOVE_MM mm
+ * OVANFÖR nämnarens plats), med samma 1,5 mm marginal på båda sidor om
+ * strecket. Räkna själv: täljarens rutas nederkant ligger på
+ * täljarplatsen+2, nämnarens rutas överkant ligger på
+ * täljarplatsen+FRACTION_BLANK_STACK_GAP_MM−FRACTION_BLANK_BOX_REACH_ABOVE_MM
+ * — strecket läggs mitt emellan de två.
+ */
+const FRACTION_BLANK_RULE_OFFSET_MM =
+  (2 + (FRACTION_BLANK_STACK_GAP_MM - FRACTION_BLANK_BOX_REACH_ABOVE_MM)) / 2;
+
+/**
+ * Geometrin för en OBESVARAD bråkuppgift (täljare/nämnare är tomma platser,
+ * inte siffror) — ett FAST avstånd (FRACTION_BLANK_STACK_GAP_MM, se
+ * layout.ts) oavsett teckenstorlek, till skillnad från computeFractionStackYs
+ * ovan. Svarsstilen 'box' är alltid BOX_SIZE_MM hög oavsett textstorlek, så
+ * en textskalad lucka skulle vid en liten teckenstorlek bli mindre än rutan
+ * själv och rutorna/strecket krocka — upptäckt genom visuell verifiering
+ * (rasteriserade PDF-sidor, se PLAN.md). Samma fasta avstånd används för
+ * alla tre svarsstilarna, för ett enhetligt utseende oavsett vilken som är
+ * vald (och eftersom layout.ts ändå måste reservera för värsta fallet).
+ */
+function computeFractionBlankStackYs(baselineY: number): FractionStackYs {
+  const denominatorY = baselineY;
+  const numeratorY = denominatorY - FRACTION_BLANK_STACK_GAP_MM;
+  const ruleY = numeratorY + FRACTION_BLANK_RULE_OFFSET_MM;
+  return { numeratorY, ruleY, denominatorY };
+}
+
+function drawStackedFractionText(
+  doc: jsPDF,
+  centerX: number,
+  baselineY: number,
+  numeratorText: string,
+  denominatorText: string,
+  fontSizePt: number,
+): void {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(fontSizePt);
+  const { numeratorY, ruleY, denominatorY } = computeFractionStackYs(baselineY, fontSizePt);
+
+  doc.text(numeratorText, centerX, numeratorY, { align: 'center' });
+  doc.text(denominatorText, centerX, denominatorY, { align: 'center' });
+
+  const ruleHalfWidth =
+    Math.max(doc.getTextWidth(numeratorText), doc.getTextWidth(denominatorText)) / 2 +
+    FRACTION_RULE_PADDING_MM;
+  doc.line(centerX - ruleHalfWidth, ruleY, centerX + ruleHalfWidth, ruleY);
+}
+
+function drawStackedFractionBlank(
+  doc: jsPDF,
+  centerX: number,
+  baselineY: number,
+  answerStyle: DocumentConfig['answerStyle'],
+  fontSizePt: number,
+): void {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(fontSizePt);
+  const { numeratorY, ruleY, denominatorY } = computeFractionBlankStackYs(baselineY);
+
+  drawCenteredBlank(doc, centerX, numeratorY, answerStyle);
+  drawCenteredBlank(doc, centerX, denominatorY, answerStyle);
+  doc.line(
+    centerX - FRACTION_RULE_MIN_WIDTH_MM / 2,
+    ruleY,
+    centerX + FRACTION_RULE_MIN_WIDTH_MM / 2,
+    ruleY,
+  );
+}
+
+/** Samma tre svarsstilar som resten av dokumentet, men centrerade kring
+ * centerX i stället för högerjusterade — se drawOperandBlank för motsvarande
+ * högerjusterade variant. */
+function drawCenteredBlank(
+  doc: jsPDF,
+  centerX: number,
+  baselineY: number,
+  answerStyle: DocumentConfig['answerStyle'],
+): void {
+  switch (answerStyle) {
+    case 'blank':
+      doc.text(FRACTION_BLANK_PLACEHOLDER, centerX, baselineY, { align: 'center' });
+      break;
+    case 'line':
+      doc.line(
+        centerX - LINE_LENGTH_MM / 2,
+        baselineY + 1,
+        centerX + LINE_LENGTH_MM / 2,
+        baselineY + 1,
+      );
+      break;
+    case 'box':
+      doc.rect(centerX - BOX_SIZE_MM / 2, baselineY - BOX_SIZE_MM + 2, BOX_SIZE_MM, BOX_SIZE_MM);
+      break;
   }
 }

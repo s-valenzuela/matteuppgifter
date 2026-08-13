@@ -1,4 +1,5 @@
 import type { jsPDF } from 'jspdf';
+import { pointAt } from './geometry';
 import { MM_PER_PT } from './layout';
 
 /** Var på radien (0–1) timmarkeringarnas inre kant börjar. */
@@ -55,12 +56,6 @@ export function drawClockFace(
 
   doc.setLineWidth(OUTLINE_LINE_WIDTH_MM * 0.5);
   doc.circle(cx, cy, CENTER_DOT_RADIUS_MM, 'F');
-}
-
-/** Punkt på cirkeln `distance` mm från centrum, `degrees` grader medurs från 12. */
-function pointAt(cx: number, cy: number, distance: number, degrees: number): [number, number] {
-  const rad = (degrees * Math.PI) / 180;
-  return [cx + distance * Math.sin(rad), cy - distance * Math.cos(rad)];
 }
 
 function drawTicks(

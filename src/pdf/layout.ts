@@ -98,7 +98,44 @@ const CLOCK_LABEL_DESCENDER_MM = 2;
 /** Extra luft mellan en klockrads block och nästa rads block. */
 const CLOCK_ROW_EXTRA_GAP_MM = 4;
 
-export type DocumentLayoutMode = 'grid' | 'vertical' | 'clock';
+/**
+ * Bråkfigurens målstorlek — samma faktor/min/max som klockans urtavla (se
+ * ovan) för att de två visuella bladtyperna ska kännas lika stora i
+ * förhållande till varandra.
+ */
+const FRACTION_SHAPE_FONT_FACTOR = 8;
+const FRACTION_SHAPE_MIN_MM = 16;
+const FRACTION_SHAPE_MAX_MM = 65;
+/** Luft runt figuren i kolumnbredden, respektive mellan kolumner. */
+const FRACTION_COLUMN_GUTTER_MM = 6;
+/** Avstånd mellan figurens nederkant och täljarens överkant, i mm — samma
+ * princip som CLOCK_FACE_LABEL_GAP_MM. Exporterad så att render.ts kan
+ * placera figurens centrum utifrån exakt samma tal som här reserverats. */
+export const FRACTION_SHAPE_LABEL_GAP_MM = 5;
+/** Extra luft under nämnarraden, för nedstick, innan nästa rads figur. */
+const FRACTION_LABEL_DESCENDER_MM = 2;
+/** Extra luft mellan en bråkrads block och nästa rads block. */
+const FRACTION_ROW_EXTRA_GAP_MM = 4;
+/**
+ * Fast avstånd (oavsett teckenstorlek) mellan täljarens och nämnarens
+ * platser i en OBESVARAD bråkuppgift (drawStackedFractionBlank i
+ * render.ts) — inte skalat med teckenstorleken som textvarianten
+ * (drawStackedFractionText), eftersom svarsstilen 'box' alltid är
+ * BOX_SIZE_MM (7 mm) hög oavsett textstorlek: vid en liten teckenstorlek
+ * skulle en textskalad lucka bli mindre än rutan själv och rutorna/strecket
+ * krocka (upptäckt genom visuell verifiering av just den kombinationen).
+ * Exporterad så att render.ts placerar täljare/streck/nämnare utifrån exakt
+ * samma tal som här reserverats i radhöjden.
+ */
+export const FRACTION_BLANK_STACK_GAP_MM = 10;
+/** Hur långt en rute-svarsplats (render.ts:s BOX_SIZE_MM=7 med samma "+2"
+ * nedåtjustering som drawOperandBlank m.fl.) sträcker sig OVANFÖR sin
+ * baslinje — hårdkodad separat här (i stället för importerad från
+ * render.ts) för att undvika ett cirkulärt beroende; ändras BOX_SIZE_MM i
+ * render.ts måste den här uppdateras manuellt. */
+const FRACTION_BLANK_BOX_REACH_ABOVE_MM = 5;
+
+export type DocumentLayoutMode = 'grid' | 'vertical' | 'clock' | 'fraction';
 
 export interface GridLayoutInput {
   problemCount: number;
@@ -130,6 +167,9 @@ export interface GridLayout {
   positions: CellPosition[];
   /** Bara satt när layout är 'clock' — urtavlans diameter, se drawClockProblem i render.ts. */
   clockDiameterMm?: number;
+  /** Bara satt när layout är 'fraction' — figurens sida (cirkelns diameter,
+   * stapelns bredd), se drawFractionProblem i render.ts. */
+  fractionSizeMm?: number;
 }
 
 export function computeGridLayout(input: GridLayoutInput): GridLayout {
@@ -145,25 +185,40 @@ export function computeGridLayout(input: GridLayoutInput): GridLayout {
     CLOCK_DIAMETER_MIN_MM,
     CLOCK_DIAMETER_MAX_MM,
   );
+  const targetFractionSizeMm = clamp(
+    fontSizeMm * FRACTION_SHAPE_FONT_FACTOR,
+    FRACTION_SHAPE_MIN_MM,
+    FRACTION_SHAPE_MAX_MM,
+  );
+  const targetVisualSizeMm =
+    layoutMode === 'fraction' ? targetFractionSizeMm : targetClockDiameterMm;
 
   const columns = resolveColumns(
     input.columns,
     layoutMode,
     fontSizeMm,
     availableWidthMm,
-    targetClockDiameterMm,
+    targetVisualSizeMm,
   );
   const columnWidthMm = availableWidthMm / columns;
 
   // Ett manuellt valt kolumnantal kan ge en kolumn som är smalare eller
-  // bredare än målstorleken — urtavlan klämmer till kolumnens faktiska
-  // bredd i stället för att sticka ut i nästa kolumn eller bli onödigt liten.
+  // bredare än målstorleken — figuren klämmer till kolumnens faktiska bredd i
+  // stället för att sticka ut i nästa kolumn eller bli onödigt liten.
   const clockDiameterMm =
     layoutMode === 'clock'
       ? clamp(
           Math.min(targetClockDiameterMm, columnWidthMm - CLOCK_COLUMN_GUTTER_MM),
           CLOCK_DIAMETER_MIN_MM,
           CLOCK_DIAMETER_MAX_MM,
+        )
+      : undefined;
+  const fractionSizeMm =
+    layoutMode === 'fraction'
+      ? clamp(
+          Math.min(targetFractionSizeMm, columnWidthMm - FRACTION_COLUMN_GUTTER_MM),
+          FRACTION_SHAPE_MIN_MM,
+          FRACTION_SHAPE_MAX_MM,
         )
       : undefined;
 
@@ -179,7 +234,22 @@ export function computeGridLayout(input: GridLayoutInput): GridLayout {
           fontSizeMm +
           CLOCK_LABEL_DESCENDER_MM +
           CLOCK_ROW_EXTRA_GAP_MM
-        : Math.max(fontSizeMm * LINE_HEIGHT_FACTOR, MIN_ROW_HEIGHT_MM);
+        : layoutMode === 'fraction'
+          ? fractionSizeMm! +
+            FRACTION_SHAPE_LABEL_GAP_MM +
+            // Räcker för det som sträcker sig längst ovanför nämnarens
+            // baslinje — den textskalade varianten (facit/"shade": siffror,
+            // se drawStackedFractionText) ELLER den fasta rute-varianten
+            // (obesvarat "identify", svarsstil 'box', se
+            // drawStackedFractionBlank) — vilken som vinner beror på
+            // teckenstorleken.
+            Math.max(
+              fontSizeMm * (1 + VERTICAL_LINE_STEP_FACTOR),
+              FRACTION_BLANK_STACK_GAP_MM + FRACTION_BLANK_BOX_REACH_ABOVE_MM,
+            ) +
+            FRACTION_LABEL_DESCENDER_MM +
+            FRACTION_ROW_EXTRA_GAP_MM
+          : Math.max(fontSizeMm * LINE_HEIGHT_FACTOR, MIN_ROW_HEIGHT_MM);
   const rowsPerPage = Math.max(1, Math.floor(availableHeightMm / rowHeightMm));
 
   const problemsPerPage = columns * rowsPerPage;
@@ -209,6 +279,7 @@ export function computeGridLayout(input: GridLayoutInput): GridLayout {
     pageCount,
     positions,
     clockDiameterMm,
+    fractionSizeMm,
   };
 }
 
@@ -217,11 +288,12 @@ function resolveColumns(
   layoutMode: DocumentLayoutMode,
   fontSizeMm: number,
   availableWidthMm: number,
-  targetClockDiameterMm: number,
+  targetVisualSizeMm: number,
 ): number {
   if (columns === 'auto') {
-    if (layoutMode === 'clock') {
-      const estimatedCellWidthMm = targetClockDiameterMm + CLOCK_COLUMN_GUTTER_MM;
+    if (layoutMode === 'clock' || layoutMode === 'fraction') {
+      const gutterMm = layoutMode === 'clock' ? CLOCK_COLUMN_GUTTER_MM : FRACTION_COLUMN_GUTTER_MM;
+      const estimatedCellWidthMm = targetVisualSizeMm + gutterMm;
       return Math.max(1, Math.floor(availableWidthMm / estimatedCellWidthMm));
     }
     const estimatedChars =

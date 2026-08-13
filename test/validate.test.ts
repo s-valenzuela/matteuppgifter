@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { validateClockConfig, validateConfig } from '../src/core/validate';
-import type { ClockGeneratorConfig } from '../src/types';
+import { FRACTION_DENOMINATORS } from '../src/core/fractions';
+import { validateClockConfig, validateConfig, validateFractionConfig } from '../src/core/validate';
+import type { ClockGeneratorConfig, FractionGeneratorConfig } from '../src/types';
 import { baseConfig, opConfig } from './helpers';
 
 function baseClockConfig(overrides: Partial<ClockGeneratorConfig> = {}): ClockGeneratorConfig {
@@ -9,6 +10,20 @@ function baseClockConfig(overrides: Partial<ClockGeneratorConfig> = {}): ClockGe
     direction: 'read',
     showNumerals: true,
     showMinuteTicks: false,
+    count: 12,
+    avoidDuplicates: true,
+    seed: 1,
+    ...overrides,
+  };
+}
+
+function baseFractionConfig(
+  overrides: Partial<FractionGeneratorConfig> = {},
+): FractionGeneratorConfig {
+  return {
+    denominators: [...FRACTION_DENOMINATORS],
+    shape: 'mixed',
+    direction: 'identify',
     count: 12,
     avoidDuplicates: true,
     seed: 1,
@@ -139,5 +154,40 @@ describe('validateClockConfig', () => {
     const { config, warnings } = validateClockConfig(baseClockConfig({ steps: [] }));
     expect(config.steps).toEqual(['hour']);
     expect(warnings.some((w) => w.includes('tidsgrupp'))).toBe(true);
+  });
+});
+
+describe('validateFractionConfig', () => {
+  it('normaliserar ett negativt antal till 0 och varnar', () => {
+    const { config, warnings } = validateFractionConfig(baseFractionConfig({ count: -3 }));
+    expect(config.count).toBe(0);
+    expect(warnings.some((w) => w.includes('Antalet uppgifter'))).toBe(true);
+  });
+
+  it('varnar när avoidDuplicates inte kan tillgodoses av de ikryssade nämnarna', () => {
+    const { warnings } = validateFractionConfig(
+      baseFractionConfig({ denominators: [2], shape: 'circle', count: 30 }),
+    );
+    expect(warnings.some((w) => w.includes('unika bråk'))).toBe(true);
+  });
+
+  it('varnar inte när de ikryssade nämnarna rymmer tillräckligt många unika bråk', () => {
+    const { warnings } = validateFractionConfig(
+      baseFractionConfig({ denominators: [...FRACTION_DENOMINATORS], shape: 'mixed', count: 30 }),
+    );
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('varnar inte när avoidDuplicates är avstängt, oavsett antal', () => {
+    const { warnings } = validateFractionConfig(
+      baseFractionConfig({ denominators: [2], count: 100, avoidDuplicates: false }),
+    );
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('faller tillbaka till alla nämnare och varnar när inga är ikryssade', () => {
+    const { config, warnings } = validateFractionConfig(baseFractionConfig({ denominators: [] }));
+    expect(config.denominators).toEqual([...FRACTION_DENOMINATORS]);
+    expect(warnings.some((w) => w.includes('nämnare'))).toBe(true);
   });
 });

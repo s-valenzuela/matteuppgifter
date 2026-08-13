@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { generateClockProblems } from '../src/core/clock';
+import { FRACTION_DENOMINATORS, generateFractionProblems } from '../src/core/fractions';
 import { generateProblems } from '../src/core/generate';
 import { computeGridLayout } from '../src/pdf/layout';
 import {
   renderClockSheetToPdf,
+  renderFractionSheetToPdf,
   renderProblemsToPdf,
   type ClockDocumentOptions,
 } from '../src/pdf/render';
-import type { ClockGeneratorConfig, DocumentConfig } from '../src/types';
+import type { ClockGeneratorConfig, DocumentConfig, FractionGeneratorConfig } from '../src/types';
 import { baseConfig, opConfig } from './helpers';
 
 function baseClockConfig(overrides: Partial<ClockGeneratorConfig> = {}): ClockGeneratorConfig {
@@ -17,6 +19,24 @@ function baseClockConfig(overrides: Partial<ClockGeneratorConfig> = {}): ClockGe
     showNumerals: true,
     showMinuteTicks: false,
     count: 12,
+    avoidDuplicates: true,
+    seed: 1,
+    ...overrides,
+  };
+}
+
+function baseFractionConfig(
+  overrides: Partial<FractionGeneratorConfig> = {},
+): FractionGeneratorConfig {
+  return {
+    denominators: [...FRACTION_DENOMINATORS],
+    shape: 'mixed',
+    direction: 'identify',
+    // 9, inte 12 som klockans motsvarighet — bråkfigurens två textrader
+    // (täljare/streck/nämnare, se drawStackedFractionText) gör varje rad
+    // högre än klockans enda textrad, så en 3×3-sida (inte 3×4) ryms på ett
+    // A4-blad vid standardstorleken 14pt, se computeGridLayout.
+    count: 9,
     avoidDuplicates: true,
     seed: 1,
     ...overrides,
@@ -318,6 +338,74 @@ describe('renderClockSheetToPdf', () => {
           clockOptions({ showNumerals, showMinuteTicks }),
         );
         expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+      }
+    }
+  });
+});
+
+describe('renderFractionSheetToPdf', () => {
+  it('genererar en icke-tom PDF för ett litet bråkblad', () => {
+    const problems = generateFractionProblems(baseFractionConfig());
+    const doc = renderFractionSheetToPdf(problems, baseDocumentConfig());
+    expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+    expect(doc.getNumberOfPages()).toBe(1);
+  });
+
+  it('lämnar en enda tom sida med bara rubriken när inga uppgifter finns', () => {
+    const doc = renderFractionSheetToPdf([], baseDocumentConfig());
+    expect(doc.getNumberOfPages()).toBe(1);
+  });
+
+  it('matchar sidantalet från layout-beräkningen för bråkläget', () => {
+    const problems = generateFractionProblems(
+      baseFractionConfig({ count: 60, avoidDuplicates: false }),
+    );
+    const config = baseDocumentConfig({ columns: 3, fontSizePt: 14 });
+    const layout = computeGridLayout({
+      problemCount: problems.length,
+      fontSizePt: config.fontSizePt,
+      columns: config.columns,
+      layout: 'fraction',
+    });
+
+    const doc = renderFractionSheetToPdf(problems, config);
+    expect(doc.getNumberOfPages()).toBe(layout.pageCount);
+  });
+
+  it('lägger till facit-sidor sist när includeAnswerKey är satt', () => {
+    const problems = generateFractionProblems(
+      baseFractionConfig({ count: 60, avoidDuplicates: false }),
+    );
+    const config = baseDocumentConfig({ columns: 3, fontSizePt: 14 });
+    const layout = computeGridLayout({
+      problemCount: problems.length,
+      fontSizePt: config.fontSizePt,
+      columns: config.columns,
+      layout: 'fraction',
+    });
+
+    const withoutKey = renderFractionSheetToPdf(problems, config);
+    const withKey = renderFractionSheetToPdf(problems, { ...config, includeAnswerKey: true });
+
+    expect(withoutKey.getNumberOfPages()).toBe(layout.pageCount);
+    expect(withKey.getNumberOfPages()).toBe(layout.pageCount * 2);
+  });
+
+  it('fungerar för alla riktningar, former, svarsstilar och nämnare, med facit, utan att kasta fel', () => {
+    for (const direction of ['identify', 'shade', 'mixed'] as const) {
+      for (const shape of ['circle', 'bar', 'mixed'] as const) {
+        for (const answerStyle of ['blank', 'line', 'box'] as const) {
+          for (const denominators of [[2], [3], [4], [5, 6], [8, 10, 12]]) {
+            const problems = generateFractionProblems(
+              baseFractionConfig({ direction, shape, denominators, count: 20 }),
+            );
+            const doc = renderFractionSheetToPdf(
+              problems,
+              baseDocumentConfig({ answerStyle, includeAnswerKey: true }),
+            );
+            expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+          }
+        }
       }
     }
   });

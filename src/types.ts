@@ -73,8 +73,8 @@ export interface DocumentConfig {
   seed: number;
 }
 
-/** Vilken typ av blad som ska genereras — styr vilken av generator/clock som används. */
-export type SheetType = 'arithmetic' | 'clock';
+/** Vilken typ av blad som ska genereras — styr vilken av generator/clock/fraction som används. */
+export type SheetType = 'arithmetic' | 'clock' | 'fraction';
 
 /**
  * Ett kryssbart minutmärke för klockuppgifter — flera kan vara påslagna
@@ -116,5 +116,42 @@ export interface ClockGeneratorConfig {
   avoidDuplicates: boolean;
   /** Visas i sidfoten så att bladet kan återskapas — separat från generator.seed
    * eftersom klockblad och räknesättsblad är oberoende av varandra (se ui/state.ts). */
+  seed: number;
+}
+
+/** 'circle' — en tårtbit-figur (cirkel delad i lika stora sektorer). 'bar' —
+ * en stapel (rektangel delad i lika breda fält). Se pdf/fractionShape.ts. */
+export type FractionShape = 'circle' | 'bar';
+
+/** 'mixed' slumpar form per uppgift, se core/fractions.ts. */
+export type FractionShapeMode = FractionShape | 'mixed';
+
+/** 'identify' — figuren är redan färglagd, eleven läser av och skriver
+ * bråket. 'shade' — bråket ges som text, eleven färglägger figuren själv
+ * (facit visar den rätt färglagd). */
+export type FractionDirection = 'identify' | 'shade';
+
+/** 'mixed' slumpar riktning per uppgift, se core/fractions.ts. */
+export type FractionDirectionMode = FractionDirection | 'mixed';
+
+export interface FractionProblem {
+  /** 1 till denominator−1 (äkta bråk — aldrig 0 eller hela figuren). */
+  numerator: number;
+  denominator: number;
+  shape: FractionShape;
+  direction: FractionDirection;
+}
+
+export interface FractionGeneratorConfig {
+  /** Vilka nämnare som får förekomma — minst en bör vara ikryssad, se
+   * FRACTION_DENOMINATORS i core/fractions.ts och validateFractionConfig. */
+  denominators: number[];
+  shape: FractionShapeMode;
+  direction: FractionDirectionMode;
+  /** Totalt antal uppgifter att generera. */
+  count: number;
+  /** Undvik dubbletter (samma form, täljare och nämnare) så länge poolen räcker till. */
+  avoidDuplicates: boolean;
+  /** Visas i sidfoten — separat seed, se motsvarande kommentar på ClockGeneratorConfig. */
   seed: number;
 }
