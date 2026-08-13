@@ -858,12 +858,18 @@ function drawFractionProblem(
 
   if (problem.direction === 'identifyPercent') {
     // Som 'identify', men svaret är bråkets andel i procent i stället för
-    // bråket självt — se drawFractionIdentifyPercentAnswer.
+    // bråket självt — se drawFractionIdentifyPercentAnswer. Till skillnad
+    // från den tvåradiga täljare/nämnare-stapeln är det här bara EN textrad,
+    // så den centreras i den plats som fractionStackReachAboveMm reserverat
+    // åt hela stapeln (i stället för att stå kvar nere vid position.yMm, där
+    // nämnaren annars hade suttit) — annars blir gapet upp mot figuren
+    // onödigt stort och gapet ner mot nästa uppgift onödigt litet.
+    const singleLineY = position.yMm - fractionStackReachAboveMm(config.fontSizePt * MM_PER_PT) / 2;
     drawFractionIdentifyPercentAnswer(
       doc,
       problem,
       centerX,
-      position.yMm,
+      singleLineY,
       config.answerStyle,
       config.fontSizePt,
       showAnswers,
