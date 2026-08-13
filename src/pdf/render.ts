@@ -468,10 +468,12 @@ function drawClockProblem(
 
   // Facit visar alltid visarna på urtavlan, oavsett riktning — annars går
   // "Rita visarna"-uppgifterna inte att kontrollera mot ett facit. I den
-  // vanliga (icke-facit) sidan saknas visarna bara för 'draw', där det är
-  // själva poängen att eleven ritar dem för hand — 'read' och 'digital'
-  // utgår båda från en synlig urtavla, bara svarsformatet skiljer dem åt.
-  const showHands = showAnswers || problem.direction !== 'draw';
+  // vanliga (icke-facit) sidan saknas visarna bara för 'draw'/'digitalDraw',
+  // där det är själva poängen att eleven ritar dem för hand — 'read' och
+  // 'digital' utgår båda från en synlig urtavla, bara svarsformatet skiljer
+  // dem åt.
+  const isDrawDirection = problem.direction === 'draw' || problem.direction === 'digitalDraw';
+  const showHands = showAnswers || !isDrawDirection;
   drawClockFace(doc, faceCenterX, faceCenterY, radius, {
     hour: showHands ? problem.hour : undefined,
     minute: showHands ? problem.minute : undefined,
@@ -479,13 +481,17 @@ function drawClockProblem(
     showMinuteTicks: clockOptions.showMinuteTicks,
   });
 
-  if (problem.direction === 'draw') {
-    // Frasen ÄR uppgiften här (urtavlan saknar visare) — samma text i både
-    // uppgift och facit, bara urtavlans visare skiljer dem åt.
-    const phrase = clockPhrase(problem.hour, problem.minute);
+  if (isDrawDirection) {
+    // Prompten (frasen eller den digitala tiden) ÄR uppgiften här (urtavlan
+    // saknar visare) — samma text i både uppgift och facit, bara urtavlans
+    // visare skiljer dem åt.
+    const label =
+      problem.direction === 'digitalDraw'
+        ? digitalTime(problem.hour, problem.minute)
+        : clockPhrase(problem.hour, problem.minute);
     drawFittedCenteredClockLabel(
       doc,
-      phrase,
+      label,
       faceCenterX,
       position.yMm,
       maxLabelWidthMm,

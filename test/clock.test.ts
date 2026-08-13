@@ -204,13 +204,19 @@ describe('generateClockProblems', () => {
     }
   });
 
-  it('ger alla tre riktningarna när direction är "mixed"', () => {
+  it('ger alltid direction "digitalDraw" när direction är "digitalDraw"', () => {
+    for (const p of generateClockProblems(clockConfig({ direction: 'digitalDraw', count: 40 }))) {
+      expect(p.direction).toBe('digitalDraw');
+    }
+  });
+
+  it('ger alla fyra riktningarna när direction är "mixed"', () => {
     const directions = new Set(
       generateClockProblems(clockConfig({ direction: 'mixed', count: 40, seed: 7 })).map(
         (p) => p.direction,
       ),
     );
-    expect(directions).toEqual(new Set(['read', 'draw', 'digital']));
+    expect(directions).toEqual(new Set(['read', 'draw', 'digital', 'digitalDraw']));
   });
 });
 

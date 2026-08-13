@@ -87,8 +87,10 @@ export type ClockStep = 'hour' | 'half' | 'quarter' | 'five';
 
 /** 'read' — läs av en urtavla med visare, skriv tiden i ord. 'draw' — given
  * tid i ord, rita visarna på en tom urtavla. 'digital' — läs av en urtavla
- * med visare, skriv tiden digitalt (t.ex. "06:30") i stället för i ord. */
-export type ClockDirection = 'read' | 'draw' | 'digital';
+ * med visare, skriv tiden digitalt (t.ex. "06:30") i stället för i ord.
+ * 'digitalDraw' — given tid digitalt (t.ex. "06:30"), rita visarna på en tom
+ * urtavla — samma som 'draw' men källan är siffror i stället för ord. */
+export type ClockDirection = 'read' | 'draw' | 'digital' | 'digitalDraw';
 
 /** 'mixed' slumpar riktning per uppgift, se core/clock.ts. */
 export type ClockDirectionMode = ClockDirection | 'mixed';
