@@ -35,12 +35,13 @@ describe('encodeState / decodeState', () => {
       clock: createDefaultState().clock,
       fraction: createDefaultState().fraction,
       document: {
-        header: { title: 'Läxa vecka 3', showName: false, showDate: true },
+        header: { title: 'Läxa vecka 3', showName: false, showDate: true, instructions: '' },
         fontSizePt: 20,
         columns: 2,
         layout: 'vertical',
         answerStyle: 'box',
         includeAnswerKey: false,
+        exampleFirst: false,
       },
     };
 
@@ -71,12 +72,13 @@ describe('encodeState / decodeState', () => {
       clock: createDefaultState().clock,
       fraction: createDefaultState().fraction,
       document: {
-        header: { title: 'Läxa vecka 3', showName: false, showDate: true },
+        header: { title: 'Läxa vecka 3', showName: false, showDate: true, instructions: '' },
         fontSizePt: 20,
         columns: 2,
         layout: 'vertical',
         answerStyle: 'box',
         includeAnswerKey: false,
+        exampleFirst: false,
       },
     };
 

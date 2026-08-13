@@ -10,7 +10,7 @@ import type {
   SheetType,
 } from '../types';
 import { LEVEL_PRESETS } from './presets';
-import type { AppState } from './state';
+import { computeDefaultInstructions, type AppState } from './state';
 
 const OPERATION_LABELS: Record<Operation, string> = {
   add: 'Addition (+)',
@@ -135,6 +135,8 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const titleEl = q<HTMLInputElement>(container, '#title');
   const showNameEl = q<HTMLInputElement>(container, '#showName');
   const showDateEl = q<HTMLInputElement>(container, '#showDate');
+  const instructionsEl = q<HTMLInputElement>(container, '#instructions');
+  const exampleFirstEl = q<HTMLInputElement>(container, '#exampleFirst');
 
   function emitChange(): void {
     for (const listener of listeners) {
@@ -228,21 +230,42 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     titleEl.value = state.document.header.title;
     showNameEl.checked = state.document.header.showName;
     showDateEl.checked = state.document.header.showDate;
+    instructionsEl.value = state.document.header.instructions;
+    exampleFirstEl.checked = state.document.exampleFirst;
+  }
+
+  /**
+   * Uppdaterar header.instructions till det nya standardvärdet, men BARA om
+   * fältet fortfarande stod på det GAMLA standardvärdet — annars skulle en
+   * användares egen, handskrivna instruktionstext skrivas över varje gång
+   * bladtyp eller riktning ändras. `change` ska vara den funktion som faktiskt
+   * utför state-ändringen (sheetType/clockDirection/fractionDirection/
+   * missingNumber) — standardvärdet räknas ut både före och efter den.
+   */
+  function updateInstructionsIfDefault(change: () => void): void {
+    const previousDefault = computeDefaultInstructions(state);
+    const hadDefault = state.document.header.instructions === previousDefault;
+    change();
+    if (hadDefault) {
+      state.document.header.instructions = computeDefaultInstructions(state);
+    }
   }
 
   for (const radio of sheetTypeRadios) {
     radio.addEventListener('change', () => {
       if (radio.checked) {
-        const previousType = state.sheetType;
-        state.sheetType = radio.value as SheetType;
-        // "Ruta" är ett naturligare standardval för bråk (en tydligt
-        // avgränsad plats att skriva täljare/nämnare i) än "Tomt streck",
-        // som är standard för räknesätt/klockan. Sätts bara vid en faktisk
-        // växling TILL bråk, inte varje gång formuläret laddas om, så att
-        // ett eget val av svarsstil inte skrivs över i onödan.
-        if (state.sheetType === 'fraction' && previousType !== 'fraction') {
-          state.document.answerStyle = 'box';
-        }
+        updateInstructionsIfDefault(() => {
+          const previousType = state.sheetType;
+          state.sheetType = radio.value as SheetType;
+          // "Ruta" är ett naturligare standardval för bråk (en tydligt
+          // avgränsad plats att skriva täljare/nämnare i) än "Tomt streck",
+          // som är standard för räknesätt/klockan. Sätts bara vid en faktisk
+          // växling TILL bråk, inte varje gång formuläret laddas om, så att
+          // ett eget val av svarsstil inte skrivs över i onödan.
+          if (state.sheetType === 'fraction' && previousType !== 'fraction') {
+            state.document.answerStyle = 'box';
+          }
+        });
         refreshFromState();
         emitChange();
       }
@@ -332,7 +355,13 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     });
   }
   clockDirectionEl.addEventListener('change', () => {
-    state.clock.direction = clockDirectionEl.value as ClockDirectionMode;
+    updateInstructionsIfDefault(() => {
+      state.clock.direction = clockDirectionEl.value as ClockDirectionMode;
+    });
+    // refreshFromState (inte bara emitChange) eftersom instruktionsfältet
+    // kan ha uppdaterats till ett nytt standardvärde, se
+    // updateInstructionsIfDefault.
+    refreshFromState();
     emitChange();
   });
   clockShowNumeralsEl.addEventListener('change', () => {
@@ -357,9 +386,13 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     emitChange();
   });
   fractionDirectionEl.addEventListener('change', () => {
-    state.fraction.direction = fractionDirectionEl.value as FractionDirectionMode;
+    updateInstructionsIfDefault(() => {
+      state.fraction.direction = fractionDirectionEl.value as FractionDirectionMode;
+    });
     // refreshFromState (inte bara emitChange) eftersom den även visar/döljer
-    // "Form" och "Visa procent" beroende på den nya riktningen.
+    // "Form" och "Visa procent" beroende på den nya riktningen, och
+    // instruktionsfältet kan ha uppdaterats till ett nytt standardvärde, se
+    // updateInstructionsIfDefault.
     refreshFromState();
     emitChange();
   });
@@ -386,7 +419,13 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     emitChange();
   });
   missingNumberEl.addEventListener('change', () => {
-    state.generator.missingNumber = missingNumberEl.checked;
+    updateInstructionsIfDefault(() => {
+      state.generator.missingNumber = missingNumberEl.checked;
+    });
+    // refreshFromState (inte bara emitChange) eftersom instruktionsfältet
+    // kan ha uppdaterats till ett nytt standardvärde, se
+    // updateInstructionsIfDefault.
+    refreshFromState();
     emitChange();
   });
   // Seedfältet är skrivskyddat som standard — det är sällan man vill skriva
@@ -448,6 +487,14 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   });
   showDateEl.addEventListener('change', () => {
     state.document.header.showDate = showDateEl.checked;
+    emitChange();
+  });
+  instructionsEl.addEventListener('input', () => {
+    state.document.header.instructions = instructionsEl.value;
+    emitChange();
+  });
+  exampleFirstEl.addEventListener('change', () => {
+    state.document.exampleFirst = exampleFirstEl.checked;
     emitChange();
   });
 
@@ -646,12 +693,16 @@ function renderTemplate(): string {
     <section aria-labelledby="extra-heading">
       <h2 id="extra-heading">Extra</h2>
       <label>Rubrik <input type="text" id="title" /></label>
+      <label>Instruktion till eleven
+        <input type="text" id="instructions" placeholder="t.ex. Rita visarna." />
+      </label>
       <div class="field-grid">
         <label><input type="checkbox" id="showName" /> Namn-fält</label>
         <label><input type="checkbox" id="showDate" /> Datum-fält</label>
         <label><input type="checkbox" id="avoidDuplicates" /> Undvik dubbletter</label>
         <label id="shuffle-field"><input type="checkbox" id="shuffle" /> Blanda ordningen</label>
         <label id="missingNumber-field"><input type="checkbox" id="missingNumber" /> Saknat tal (t.ex. 3 + __ = 10)</label>
+        <label><input type="checkbox" id="exampleFirst" /> Lös första uppgiften som exempel</label>
       </div>
       <label>
         Seed

@@ -15,9 +15,11 @@ import {
   A4_METRICS,
   CLOCK_FACE_LABEL_GAP_MM,
   computeGridLayout,
+  computeHeaderHeightMm,
   FRACTION_BLANK_STACK_GAP_MM,
   fractionStackReachAboveMm,
   FRACTION_SHAPE_LABEL_GAP_MM,
+  HEADER_EXTRA_LINE_MM,
   MM_PER_PT,
   VERTICAL_BOX_GAP_FACTOR,
   VERTICAL_BOX_HEIGHT_FACTOR,
@@ -25,6 +27,7 @@ import {
   VERTICAL_RULE_GAP_FACTOR,
   type CellPosition,
   type GridLayout,
+  type PageMetrics,
 } from './layout';
 
 const BLANK_PLACEHOLDER = '_______';
@@ -85,11 +88,12 @@ export function renderProblemsToPdf(problems: Problem[], config: DocumentConfig)
     fontSizePt: config.fontSizePt,
     columns: config.columns,
     layout: config.layout,
+    metrics: layoutMetricsFor(config, problems.length),
   });
 
   if (layout.pageCount === 0) {
     // Inga uppgifter att rita — lämna kvar en enda sida med bara rubriken.
-    drawHeader(doc, config, null);
+    drawHeader(doc, config, null, false);
     drawFooter(doc, 0, 1, config.seed);
     return doc;
   }
@@ -126,17 +130,54 @@ function renderSection(
     if (page > 0) {
       doc.addPage();
     }
-    drawHeader(doc, config, options.sectionLabel);
+    const showExampleNote = !options.showAnswers && config.exampleFirst && page === 0;
+    drawHeader(doc, config, options.sectionLabel, showExampleNote);
     for (const position of layout.positions) {
       if (position.page === page) {
-        drawProblem(doc, problems[position.index], position, config, options.showAnswers, metrics);
+        const showAnswers = options.showAnswers || (config.exampleFirst && position.index === 0);
+        drawProblem(doc, problems[position.index], position, config, showAnswers, metrics);
       }
     }
     drawFooter(doc, page, layout.pageCount, config.seed);
   }
 }
 
-function drawHeader(doc: jsPDF, config: DocumentConfig, sectionLabel: string | null): void {
+/** Hur många extra rader (utöver titel + namn/datum) som sidhuvudet behöver
+ * rymma — instruktionstexten och/eller "löst exempel"-notisen, se
+ * drawHeader. Delad av alla tre renderXToPdf-funktionerna så att
+ * layout.ts:s radhöjdsreservation och render.ts:s faktiska utskrift alltid
+ * använder exakt samma tal (samma princip som fractionStackReachAboveMm). */
+function headerExtraLineCount(config: DocumentConfig, problemCount: number): number {
+  return (
+    (config.header.instructions.trim() ? 1 : 0) + (config.exampleFirst && problemCount > 0 ? 1 : 0)
+  );
+}
+
+/** `metrics` att skicka till computeGridLayout — A4_METRICS med en högre
+ * headerHeightMm om sidhuvudet behöver extra rader (se headerExtraLineCount),
+ * annars odefinierad så computeGridLayout faller tillbaka till sitt eget
+ * standardvärde. */
+function layoutMetricsFor(config: DocumentConfig, problemCount: number): PageMetrics | undefined {
+  const extraLineCount = headerExtraLineCount(config, problemCount);
+  if (extraLineCount === 0) return undefined;
+  return {
+    ...A4_METRICS,
+    headerHeightMm: computeHeaderHeightMm(A4_METRICS.headerHeightMm, extraLineCount),
+  };
+}
+
+/**
+ * `showExampleNote` skrivs bara ut på UPPGIFTSSIDAN (facit behöver den
+ * inte — där är alla uppgifter redan lösta) och bara när det faktiskt
+ * finns en uppgift 1 att exemplifiera, se headerExtraLineCount och de tre
+ * renderXSection-funktionerna.
+ */
+function drawHeader(
+  doc: jsPDF,
+  config: DocumentConfig,
+  sectionLabel: string | null,
+  showExampleNote: boolean,
+): void {
   const { marginMm } = A4_METRICS;
 
   doc.setFont('helvetica', 'bold');
@@ -146,19 +187,36 @@ function drawHeader(doc: jsPDF, config: DocumentConfig, sectionLabel: string | n
     doc.text(titleText, marginMm, marginMm + 5);
   }
 
-  if (!sectionLabel) {
+  if (sectionLabel) return;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  let y = marginMm + 12;
+
+  const fields: string[] = [];
+  if (config.header.showName) {
+    fields.push('Namn: _______________________');
+  }
+  if (config.header.showDate) {
+    fields.push('Datum: ______________');
+  }
+  if (fields.length > 0) {
+    doc.text(fields.join('        '), marginMm, y);
+    y += HEADER_EXTRA_LINE_MM;
+  }
+
+  const instructions = config.header.instructions.trim();
+  if (instructions) {
+    doc.setFont('helvetica', 'italic');
+    doc.text(instructions, marginMm, y);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    const fields: string[] = [];
-    if (config.header.showName) {
-      fields.push('Namn: _______________________');
-    }
-    if (config.header.showDate) {
-      fields.push('Datum: ______________');
-    }
-    if (fields.length > 0) {
-      doc.text(fields.join('        '), marginMm, marginMm + 12);
-    }
+    y += HEADER_EXTRA_LINE_MM;
+  }
+
+  if (showExampleNote) {
+    doc.setFont('helvetica', 'italic');
+    doc.text('Uppgift 1 är ett löst exempel.', marginMm, y);
+    doc.setFont('helvetica', 'normal');
   }
 }
 
@@ -397,10 +455,11 @@ export function renderClockSheetToPdf(
     fontSizePt: config.fontSizePt,
     columns: config.columns,
     layout: 'clock',
+    metrics: layoutMetricsFor(config, problems.length),
   });
 
   if (layout.pageCount === 0) {
-    drawHeader(doc, config, null);
+    drawHeader(doc, config, null, false);
     drawFooter(doc, 0, 1, config.seed);
     return doc;
   }
@@ -433,9 +492,11 @@ function renderClockSection(
     if (page > 0) {
       doc.addPage();
     }
-    drawHeader(doc, config, options.sectionLabel);
+    const showExampleNote = !options.showAnswers && config.exampleFirst && page === 0;
+    drawHeader(doc, config, options.sectionLabel, showExampleNote);
     for (const position of layout.positions) {
       if (position.page === page) {
+        const showAnswers = options.showAnswers || (config.exampleFirst && position.index === 0);
         drawClockProblem(
           doc,
           problems[position.index],
@@ -443,7 +504,7 @@ function renderClockSection(
           layout,
           config,
           clockOptions,
-          options.showAnswers,
+          showAnswers,
         );
       }
     }
@@ -692,10 +753,11 @@ export function renderFractionSheetToPdf(
     fontSizePt: config.fontSizePt,
     columns: config.columns,
     layout: layoutMode,
+    metrics: layoutMetricsFor(config, problems.length),
   });
 
   if (layout.pageCount === 0) {
-    drawHeader(doc, config, null);
+    drawHeader(doc, config, null, false);
     drawFooter(doc, 0, 1, config.seed);
     return doc;
   }
@@ -728,9 +790,11 @@ function renderFractionSection(
     if (page > 0) {
       doc.addPage();
     }
-    drawHeader(doc, config, options.sectionLabel);
+    const showExampleNote = !options.showAnswers && config.exampleFirst && page === 0;
+    drawHeader(doc, config, options.sectionLabel, showExampleNote);
     for (const position of layout.positions) {
       if (position.page === page) {
+        const showAnswers = options.showAnswers || (config.exampleFirst && position.index === 0);
         drawFractionProblem(
           doc,
           problems[position.index],
@@ -738,7 +802,7 @@ function renderFractionSection(
           layout,
           config,
           fractionOptions,
-          options.showAnswers,
+          showAnswers,
         );
       }
     }

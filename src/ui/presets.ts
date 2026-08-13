@@ -1,4 +1,4 @@
-import { createDefaultState, type AppState } from './state';
+import { computeDefaultInstructions, createDefaultState, type AppState } from './state';
 
 export interface Preset {
   id: string;
@@ -19,6 +19,7 @@ export const PRESETS: Preset[] = [
         div: { enabled: false, operandRange: { min: 1, max: 10 } },
       };
       state.document.header.title = 'Addition 0–10';
+      state.document.header.instructions = computeDefaultInstructions(state);
       return state;
     },
   },
@@ -38,6 +39,7 @@ export const PRESETS: Preset[] = [
         div: { enabled: false, operandRange: { min: 1, max: 10 } },
       };
       state.document.header.title = 'Multiplikationstabeller';
+      state.document.header.instructions = computeDefaultInstructions(state);
       return state;
     },
   },
@@ -53,6 +55,7 @@ export const PRESETS: Preset[] = [
         div: { enabled: true, operandRange: { min: 1, max: 10 } },
       };
       state.document.header.title = 'Blandat 0–100';
+      state.document.header.instructions = computeDefaultInstructions(state);
       return state;
     },
   },
@@ -64,6 +67,7 @@ export const PRESETS: Preset[] = [
       state.sheetType = 'clock';
       state.clock.steps = ['hour', 'half'];
       state.document.header.title = 'Klockan — hel och halv';
+      state.document.header.instructions = computeDefaultInstructions(state);
       return state;
     },
   },
@@ -75,6 +79,7 @@ export const PRESETS: Preset[] = [
       state.sheetType = 'clock';
       state.clock.steps = ['hour', 'half', 'quarter'];
       state.document.header.title = 'Klockan — kvart';
+      state.document.header.instructions = computeDefaultInstructions(state);
       return state;
     },
   },
@@ -86,6 +91,7 @@ export const PRESETS: Preset[] = [
       state.sheetType = 'clock';
       state.clock.steps = ['hour', 'half', 'quarter', 'five'];
       state.document.header.title = 'Klockan — alla minuter';
+      state.document.header.instructions = computeDefaultInstructions(state);
       return state;
     },
   },
@@ -100,6 +106,7 @@ export const PRESETS: Preset[] = [
       state.fraction.direction = 'identify';
       state.document.answerStyle = 'box';
       state.document.header.title = 'Bråk — cirkel';
+      state.document.header.instructions = computeDefaultInstructions(state);
       return state;
     },
   },
@@ -114,6 +121,7 @@ export const PRESETS: Preset[] = [
       state.fraction.direction = 'shade';
       state.document.answerStyle = 'box';
       state.document.header.title = 'Bråk — färglägg';
+      state.document.header.instructions = computeDefaultInstructions(state);
       return state;
     },
   },
