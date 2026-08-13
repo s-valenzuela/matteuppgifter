@@ -133,7 +133,7 @@ function clockKey(hour: number, minute: number): string {
 }
 
 function resolveDirection(mode: ClockDirectionMode, rng: Rng): ClockDirection {
-  return mode === 'mixed' ? pick(rng, ['read', 'draw', 'digital']) : mode;
+  return mode === 'mixed' ? pick(rng, ['read', 'draw', 'digital', 'digitalDraw']) : mode;
 }
 
 /** T.ex. "06:30" — samma tvåsiffriga urtavla (1–12) som problem.hour redan
