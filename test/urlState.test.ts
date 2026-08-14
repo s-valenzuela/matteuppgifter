@@ -35,6 +35,7 @@ describe('encodeState / decodeState', () => {
       clock: createDefaultState().clock,
       fraction: createDefaultState().fraction,
       geometry: createDefaultState().geometry,
+      pattern: createDefaultState().pattern,
       document: {
         header: { title: 'Läxa vecka 3', showName: false, showDate: true, instructions: '' },
         fontSizePt: 20,
@@ -73,6 +74,7 @@ describe('encodeState / decodeState', () => {
       clock: createDefaultState().clock,
       fraction: createDefaultState().fraction,
       geometry: createDefaultState().geometry,
+      pattern: createDefaultState().pattern,
       document: {
         header: { title: 'Läxa vecka 3', showName: false, showDate: true, instructions: '' },
         fontSizePt: 20,
@@ -299,6 +301,49 @@ describe('encodeState / decodeState', () => {
       const state = createDefaultState();
       state.sheetType = 'fraction';
       state.fraction.seed = 111;
+      state.generator.seed = 222;
+      expect(toDocumentConfig(state).seed).toBe(111);
+    });
+  });
+
+  describe('mönsterblad', () => {
+    it('en avkodad standardkonfiguration för mönsterblad återskapar exakt samma AppState', () => {
+      const state = createDefaultState();
+      state.sheetType = 'pattern';
+      const decoded = decodeState(`?${encodeState(state).toString()}`);
+      expect(decoded).toEqual(state);
+    });
+
+    it('kodar och avkodar alla mönsterinställningar genom en tur-och-retur', () => {
+      const state = createDefaultState();
+      state.sheetType = 'pattern';
+      state.pattern = {
+        startRange: { min: 3, max: 15 },
+        steps: [2, 5],
+        allowDescending: true,
+        termCount: 8,
+        hiddenCount: 3,
+        count: 24,
+        avoidDuplicates: false,
+        seed: 555,
+      };
+
+      const decoded = decodeState(`?${encodeState(state).toString()}`);
+      expect(decoded?.pattern).toEqual(state.pattern);
+      expect(decoded?.sheetType).toBe('pattern');
+    });
+
+    it('faller tillbaka till standardvärden för skräpvärden i mönsterfälten', () => {
+      const fallback = createDefaultState();
+      const decoded = decodeState('?add=0:10&psteps=&pmin=abc');
+      expect(decoded?.pattern.steps).toEqual(fallback.pattern.steps);
+      expect(decoded?.pattern.startRange.min).toBe(fallback.pattern.startRange.min);
+    });
+
+    it('sätter footer-seeden från pattern.seed när sheetType är "pattern"', () => {
+      const state = createDefaultState();
+      state.sheetType = 'pattern';
+      state.pattern.seed = 111;
       state.generator.seed = 222;
       expect(toDocumentConfig(state).seed).toBe(111);
     });

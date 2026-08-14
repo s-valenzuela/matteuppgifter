@@ -160,6 +160,19 @@ const FRACTION_BLANK_BOX_REACH_ABOVE_MM = 5;
 const ESTIMATED_CHARS_PER_PROBLEM_FRACTION_TEXT = 13;
 
 /**
+ * Uppskattat antal tecken PER TERM i en talföljd (upp till tresiffrigt tal +
+ * ", "-avskiljare), för 'pattern'-lägets kolumnbredd — se resolveColumns.
+ * Till skillnad från klockan/bråket/geometrin beror radens bredd på
+ * termCount, ett dokumentnivå-val, inte på teckenstorleken ensam, så
+ * uppskattningen görs per term och multipliceras med termCount i
+ * resolveColumns.
+ */
+const ESTIMATED_CHARS_PER_TERM_PATTERN = 4;
+/** Om termCount saknas i GridLayoutInput (bör inte hända i praktiken, men
+ * computeGridLayout ska aldrig krascha på ett ofullständigt anrop). */
+const DEFAULT_PATTERN_TERM_COUNT = 6;
+
+/**
  * Geometrifigurens målstorlek — samma faktor/min/max som klockan och bråket
  * (se ovan) så att alla tre figurbaserade bladtyperna känns lika stora.
  * Rutan rymmer BÅDE figuren och dess måttetiketter; geometryFigure.ts drar in
@@ -197,7 +210,7 @@ export function fractionStackReachAboveMm(fontSizeMm: number): number {
 }
 
 export type DocumentLayoutMode =
-  'grid' | 'vertical' | 'clock' | 'fraction' | 'fractionText' | 'geometry';
+  'grid' | 'vertical' | 'clock' | 'fraction' | 'fractionText' | 'geometry' | 'pattern';
 
 export interface GridLayoutInput {
   problemCount: number;
@@ -206,6 +219,12 @@ export interface GridLayoutInput {
   /** Standard 'grid' om utelämnad. */
   layout?: DocumentLayoutMode;
   metrics?: PageMetrics;
+  /** Antal termer per talföljd — bara använt när layout är 'pattern', för att
+   * uppskatta radbredden (se resolveColumns). Till skillnad från klockans/
+   * bråkets/geometrins figurstorlek (som räknas ut ur fontSizePt ensam) beror
+   * en talföljdsrads bredd på ett dokumentnivå-val, så det måste skickas in
+   * separat. */
+  termCount?: number;
 }
 
 export interface CellPosition {
@@ -273,6 +292,7 @@ export function computeGridLayout(input: GridLayoutInput): GridLayout {
     fontSizeMm,
     availableWidthMm,
     targetVisualSizeMm,
+    input.termCount,
   );
   const columnWidthMm = availableWidthMm / columns;
 
@@ -379,6 +399,7 @@ function resolveColumns(
   fontSizeMm: number,
   availableWidthMm: number,
   targetVisualSizeMm: number,
+  termCount: number | undefined,
 ): number {
   if (columns === 'auto') {
     if (layoutMode === 'clock' || layoutMode === 'fraction' || layoutMode === 'geometry') {
@@ -396,7 +417,9 @@ function resolveColumns(
         ? ESTIMATED_CHARS_PER_PROBLEM_VERTICAL
         : layoutMode === 'fractionText'
           ? ESTIMATED_CHARS_PER_PROBLEM_FRACTION_TEXT
-          : ESTIMATED_CHARS_PER_PROBLEM;
+          : layoutMode === 'pattern'
+            ? (termCount ?? DEFAULT_PATTERN_TERM_COUNT) * ESTIMATED_CHARS_PER_TERM_PATTERN
+            : ESTIMATED_CHARS_PER_PROBLEM;
     const estimatedCellWidthMm =
       fontSizeMm * AVG_CHAR_WIDTH_FACTOR * estimatedChars + COLUMN_GUTTER_MM;
     return Math.max(1, Math.floor(availableWidthMm / estimatedCellWidthMm));

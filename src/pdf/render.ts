@@ -8,6 +8,8 @@ import type {
   FractionProblem,
   GeometryGeneratorConfig,
   GeometryProblem,
+  PatternGeneratorConfig,
+  PatternProblem,
   Problem,
 } from '../types';
 import {
@@ -1421,5 +1423,191 @@ function drawGeometryProblem(
     answerStyle: config.answerStyle,
     maxWidthMm,
     basePt: config.fontSizePt,
+  });
+}
+
+/**
+ * Mönsterblad delar sidhuvud/sidfot och sidbrytningslogik med de andra
+ * renderXToPdf-funktionerna, men har ett eget uppgiftsformat: en rad med
+ * termCount termer i följd, där hiddenIndices pekar ut vilka som är tomma,
+ * se drawPatternProblem.
+ */
+/** Den del av PatternGeneratorConfig som faktiskt behövs för att RITA ett
+ * mönsterblad — termCount styr radens bredd (se computeGridLayout/
+ * resolveColumns i layout.ts), resten styr bara genereringen. Samma mönster
+ * som ClockDocumentOptions. */
+export type PatternDocumentOptions = Pick<PatternGeneratorConfig, 'termCount'>;
+
+/**
+ * Hur brett varje termkolumn behöver vara — max antal siffertecken för just
+ * det indexet över ALLA uppgifter i dokumentet, så att termerna (och
+ * kommatecknen mellan dem) hamnar på samma x-position rad efter rad, samma
+ * princip som computeOperandDigitCounts/ProblemMetrics för räknesättsbladet.
+ *
+ * `fontSizePt` kan vara MINDRE än dokumentets valda teckenstorlek: till
+ * skillnad från klockans/bråkets/geometrins figur (som alltid klämmer till
+ * sin faktiska kolumnbredd, se computeGridLayout) skalas INTE en talföljds
+ * radbredd automatiskt av layout.ts — den beror på termCount, ett fritt
+ * användarval som kan göra raden bredare än en manuellt satt (icke-"auto")
+ * kolumnbredd. Hela raden krymps därför gemensamt, precis som
+ * drawCenteredPromptWithBlank krymper en enskild etikett, annars skulle
+ * termerna sticka ut i nästa kolumn.
+ */
+interface PatternMetrics {
+  fontSizePt: number;
+  termWidthsMm: number[];
+  separatorWidthMm: number;
+}
+
+function computePatternMetrics(
+  doc: jsPDF,
+  problems: PatternProblem[],
+  fontSizePt: number,
+  termCount: number,
+  maxWidthMm: number,
+): PatternMetrics {
+  const measure = (pt: number): { termWidthsMm: number[]; separatorWidthMm: number } => {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(pt);
+    const digitWidthMm = doc.getTextWidth('0');
+    const digitCounts = new Array<number>(termCount).fill(1);
+    for (const problem of problems) {
+      problem.terms.forEach((term, i) => {
+        digitCounts[i] = Math.max(digitCounts[i], String(term).length);
+      });
+    }
+    return {
+      termWidthsMm: digitCounts.map((count) => count * digitWidthMm),
+      separatorWidthMm: doc.getTextWidth(PATTERN_SEPARATOR),
+    };
+  };
+
+  let { termWidthsMm, separatorWidthMm } = measure(fontSizePt);
+  const naturalWidthMm = (widths: number[], sepWidth: number): number =>
+    widths.reduce((sum, w) => sum + w, 0) + (termCount - 1) * sepWidth;
+
+  let effectiveFontSizePt = fontSizePt;
+  const totalWidthMm = naturalWidthMm(termWidthsMm, separatorWidthMm);
+  if (totalWidthMm > maxWidthMm) {
+    effectiveFontSizePt = Math.max(
+      fontSizePt * (maxWidthMm / totalWidthMm),
+      MIN_CLOCK_LABEL_FONT_PT,
+    );
+    ({ termWidthsMm, separatorWidthMm } = measure(effectiveFontSizePt));
+  }
+
+  return { fontSizePt: effectiveFontSizePt, termWidthsMm, separatorWidthMm };
+}
+
+/** Luft mellan varje term i en talföljd, t.ex. "2, 4, 6, __, 10". */
+const PATTERN_SEPARATOR = ', ';
+
+export function renderPatternSheetToPdf(
+  problems: PatternProblem[],
+  config: DocumentConfig,
+  patternOptions: PatternDocumentOptions,
+): jsPDF {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const layout = computeGridLayout({
+    problemCount: problems.length,
+    fontSizePt: config.fontSizePt,
+    columns: config.columns,
+    layout: 'pattern',
+    termCount: patternOptions.termCount,
+    metrics: layoutMetricsFor(config, problems.length),
+  });
+
+  if (layout.pageCount === 0) {
+    drawHeader(doc, config, null, false);
+    drawFooter(doc, 0, 1, config.seed);
+    return doc;
+  }
+
+  const metrics = computePatternMetrics(
+    doc,
+    problems,
+    config.fontSizePt,
+    patternOptions.termCount,
+    layout.columnWidthMm - GEOMETRY_LABEL_MAX_WIDTH_MARGIN_MM,
+  );
+
+  renderPatternSection(doc, problems, layout, config, metrics, {
+    showAnswers: false,
+    sectionLabel: null,
+  });
+
+  if (config.includeAnswerKey) {
+    doc.addPage();
+    renderPatternSection(doc, problems, layout, config, metrics, {
+      showAnswers: true,
+      sectionLabel: 'Facit',
+    });
+  }
+
+  return doc;
+}
+
+function renderPatternSection(
+  doc: jsPDF,
+  problems: PatternProblem[],
+  layout: GridLayout,
+  config: DocumentConfig,
+  metrics: PatternMetrics,
+  options: SectionOptions,
+): void {
+  for (let page = 0; page < layout.pageCount; page++) {
+    if (page > 0) {
+      doc.addPage();
+    }
+    const showExampleNote = !options.showAnswers && config.exampleFirst && page === 0;
+    drawHeader(doc, config, options.sectionLabel, showExampleNote);
+    for (const position of layout.positions) {
+      if (position.page === page) {
+        const showAnswers = options.showAnswers || (config.exampleFirst && position.index === 0);
+        drawPatternProblem(doc, problems[position.index], position, config, showAnswers, metrics);
+      }
+    }
+    drawFooter(doc, page, layout.pageCount, config.seed);
+  }
+}
+
+/**
+ * Ritar termCount termer i följd, högerjusterade var och en inom sin egen
+ * fasta kolumnbredd (metrics.termWidthsMm[i]) — samma teknik som
+ * drawGridProblem använder för operand A/B, så att kommatecknen hamnar på
+ * samma x-position rad efter rad oavsett hur många siffror en enskild term
+ * råkar ha. Dolda termer (problem.hiddenIndices) ritas som en tom plats med
+ * drawOperandBlank, precis som "Saknat tal"-läget i drawGridProblem.
+ */
+function drawPatternProblem(
+  doc: jsPDF,
+  problem: PatternProblem,
+  position: CellPosition,
+  config: DocumentConfig,
+  showAnswers: boolean,
+  metrics: PatternMetrics,
+): void {
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(metrics.fontSizePt);
+
+  const separatorWidth = metrics.separatorWidthMm;
+  let x = position.xMm;
+
+  problem.terms.forEach((term, index) => {
+    const slotWidthMm = metrics.termWidthsMm[index];
+    const rightEdgeX = x + slotWidthMm;
+    const isHidden = !showAnswers && problem.hiddenIndices.includes(index);
+
+    if (isHidden) {
+      drawOperandBlank(doc, rightEdgeX, position.yMm, slotWidthMm, config.answerStyle);
+    } else {
+      doc.text(String(term), rightEdgeX, position.yMm, { align: 'right' });
+    }
+
+    x = rightEdgeX;
+    if (index < problem.terms.length - 1) {
+      doc.text(PATTERN_SEPARATOR, x, position.yMm);
+      x += separatorWidth;
+    }
   });
 }

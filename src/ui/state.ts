@@ -9,6 +9,7 @@ import type {
   GeometryGeneratorConfig,
   GeometryMeasureMode,
   OperationConfig,
+  PatternGeneratorConfig,
   SheetType,
 } from '../types';
 
@@ -30,6 +31,7 @@ export interface AppState {
   clock: ClockGeneratorConfig;
   fraction: FractionGeneratorConfig;
   geometry: GeometryGeneratorConfig;
+  pattern: PatternGeneratorConfig;
   document: Omit<DocumentConfig, 'seed'>;
 }
 
@@ -41,7 +43,9 @@ export function toDocumentConfig(state: AppState): DocumentConfig {
         ? state.fraction.seed
         : state.sheetType === 'geometry'
           ? state.geometry.seed
-          : state.generator.seed;
+          : state.sheetType === 'pattern'
+            ? state.pattern.seed
+            : state.generator.seed;
   return { ...state.document, seed };
 }
 
@@ -72,6 +76,7 @@ export function createDefaultState(): AppState {
     clock: createDefaultClockConfig(),
     fraction: createDefaultFractionConfig(),
     geometry: createDefaultGeometryConfig(),
+    pattern: createDefaultPatternConfig(),
     document: {
       header: { title: 'Matteuppgifter', showName: true, showDate: true, instructions: '' },
       fontSizePt: 14,
@@ -114,6 +119,11 @@ const FRACTION_INSTRUCTIONS: Record<FractionDirectionMode, string> = {
   mixed: '',
 };
 
+/** Instruktionstext för mönsterblad — se DocumentHeader.instructions. Bara en
+ * variant (till skillnad från klockan/bråket/geometrin) eftersom mönsterblad
+ * inte har någon "riktning" som varierar. */
+const PATTERN_INSTRUCTIONS = 'Fyll i de tal som saknas i talföljden.';
+
 /**
  * Ett vettigt standardvärde för header.instructions, beräknat utifrån
  * bladtyp och (för klocka/bråk) vald riktning, eller (för räknesätt) om
@@ -131,6 +141,8 @@ export function computeDefaultInstructions(state: AppState): string {
       return FRACTION_INSTRUCTIONS[state.fraction.direction];
     case 'geometry':
       return GEOMETRY_INSTRUCTIONS[state.geometry.measure];
+    case 'pattern':
+      return PATTERN_INSTRUCTIONS;
   }
 }
 
@@ -168,6 +180,19 @@ function createDefaultGeometryConfig(): GeometryGeneratorConfig {
     sideRange: { min: 2, max: 10 },
     showUnits: true,
     count: 9,
+    avoidDuplicates: true,
+    seed: randomSeed(),
+  };
+}
+
+function createDefaultPatternConfig(): PatternGeneratorConfig {
+  return {
+    startRange: { min: 0, max: 20 },
+    steps: [1, 2],
+    allowDescending: false,
+    termCount: 6,
+    hiddenCount: 2,
+    count: 10,
     avoidDuplicates: true,
     seed: randomSeed(),
   };

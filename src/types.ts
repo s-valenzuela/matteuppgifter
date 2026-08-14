@@ -91,8 +91,8 @@ export interface DocumentConfig {
 }
 
 /** Vilken typ av blad som ska genereras — styr vilken av
- * generator/clock/fraction/geometry som används. */
-export type SheetType = 'arithmetic' | 'clock' | 'fraction' | 'geometry';
+ * generator/clock/fraction/geometry/pattern som används. */
+export type SheetType = 'arithmetic' | 'clock' | 'fraction' | 'geometry' | 'pattern';
 
 /**
  * Ett kryssbart minutmärke för klockuppgifter — flera kan vara påslagna
@@ -229,6 +229,43 @@ export interface GeometryGeneratorConfig {
   /** Totalt antal uppgifter att generera. */
   count: number;
   /** Undvik dubbletter (samma figur, mått och efterfrågat mått) så länge poolen räcker till. */
+  avoidDuplicates: boolean;
+  /** Visas i sidfoten — separat seed, se motsvarande kommentar på ClockGeneratorConfig. */
+  seed: number;
+}
+
+/**
+ * En talföljd med jämnt mellanrum (steg), t.ex. "2, 4, 6, __, 10". Index 0
+ * och 1 i terms är ALLTID synliga (aldrig med i hiddenIndices) — de två
+ * ankartermerna gör att steget går att läsa av direkt, se
+ * generatePatternProblems i core/patterns.ts.
+ */
+export interface PatternProblem {
+  /** Alla termer i följden, i ordning. */
+  terms: number[];
+  /** 0-baserade index i terms som är dolda och ska fyllas i av eleven. */
+  hiddenIndices: number[];
+  /** Skillnaden mellan varje term (negativ för en nedåtgående följd). */
+  step: number;
+}
+
+export interface PatternGeneratorConfig {
+  /** Talområde för följdens första term. */
+  startRange: Range;
+  /** Möjliga steg (skillnaden mellan varje term) — minst ett bör vara ikryssat, se
+   * validatePatternConfig. */
+  steps: number[];
+  /** Om steget slumpmässigt kan bli negativt (nedåtgående följd) utöver de
+   * positiva talen i `steps`. */
+  allowDescending: boolean;
+  /** Antal termer per talföljd (minst 4: två synliga ankartermer + minst en
+   * dold + minst en till). */
+  termCount: number;
+  /** Antal dolda termer (minst 1, som mest termCount - 2). */
+  hiddenCount: number;
+  /** Totalt antal uppgifter att generera. */
+  count: number;
+  /** Undvik dubbletter (samma start, steg och dolda index) så länge poolen räcker till. */
   avoidDuplicates: boolean;
   /** Visas i sidfoten — separat seed, se motsvarande kommentar på ClockGeneratorConfig. */
   seed: number;

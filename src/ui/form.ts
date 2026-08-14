@@ -67,6 +67,10 @@ const GEOMETRY_MEASURE_LABELS: Record<GeometryMeasureMode, string> = {
   mixed: 'Blandat',
 };
 
+/** Kryssbara steg för mönsterblad — ett urval, inte en uttömmande lista:
+ * PatternGeneratorConfig.steps är fria positiva heltal, se types.ts. */
+const PATTERN_STEP_OPTIONS: readonly number[] = [1, 2, 3, 5, 10];
+
 // Feather-ikon (MIT), inbäddad som inline-SVG istället för en extern ikonfil
 // eftersom appen inte har några andra tillgångar att ladda in.
 const EDIT_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true" focusable="false"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>`;
@@ -100,6 +104,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const clockSection = q<HTMLElement>(container, '#clock-section');
   const fractionSection = q<HTMLElement>(container, '#fraction-section');
   const geometrySection = q<HTMLElement>(container, '#geometry-section');
+  const patternSection = q<HTMLElement>(container, '#pattern-section');
 
   const operationEls = new Map(
     OPERATION_KEYS.map((key) => [
@@ -140,6 +145,18 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const geometryMaxEl = q<HTMLInputElement>(container, '#geometry-max');
   const geometryShowUnitsEl = q<HTMLInputElement>(container, '#geometry-showUnits');
 
+  const patternStepEls = new Map(
+    PATTERN_STEP_OPTIONS.map((step) => [
+      step,
+      q<HTMLInputElement>(container, `#pattern-step-${step}`),
+    ]),
+  );
+  const patternDescendingEl = q<HTMLInputElement>(container, '#pattern-descending');
+  const patternMinEl = q<HTMLInputElement>(container, '#pattern-min');
+  const patternMaxEl = q<HTMLInputElement>(container, '#pattern-max');
+  const patternTermCountEl = q<HTMLInputElement>(container, '#pattern-termCount');
+  const patternHiddenCountEl = q<HTMLInputElement>(container, '#pattern-hiddenCount');
+
   const countEl = q<HTMLInputElement>(container, '#count');
   const avoidDuplicatesEl = q<HTMLInputElement>(container, '#avoidDuplicates');
   const shuffleEl = q<HTMLInputElement>(container, '#shuffle');
@@ -178,6 +195,10 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     return state.sheetType === 'geometry';
   }
 
+  function isPattern(): boolean {
+    return state.sheetType === 'pattern';
+  }
+
   function isArithmetic(): boolean {
     return state.sheetType === 'arithmetic';
   }
@@ -191,6 +212,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     if (isClock()) return state.clock;
     if (isFraction()) return state.fraction;
     if (isGeometry()) return state.geometry;
+    if (isPattern()) return state.pattern;
     return state.generator;
   }
 
@@ -205,6 +227,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     clockSection.hidden = !isClock();
     fractionSection.hidden = !isFraction();
     geometrySection.hidden = !isGeometry();
+    patternSection.hidden = !isPattern();
 
     for (const key of OPERATION_KEYS) {
       const cfg = state.generator.operations[key];
@@ -245,6 +268,15 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     geometryMinEl.value = String(state.geometry.sideRange.min);
     geometryMaxEl.value = String(state.geometry.sideRange.max);
     geometryShowUnitsEl.checked = state.geometry.showUnits;
+
+    for (const [step, el] of patternStepEls) {
+      el.checked = state.pattern.steps.includes(step);
+    }
+    patternDescendingEl.checked = state.pattern.allowDescending;
+    patternMinEl.value = String(state.pattern.startRange.min);
+    patternMaxEl.value = String(state.pattern.startRange.max);
+    patternTermCountEl.value = String(state.pattern.termCount);
+    patternHiddenCountEl.value = String(state.pattern.hiddenCount);
 
     const countable = activeCountable();
     countEl.value = String(countable.count);
@@ -474,6 +506,47 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     emitChange();
   });
 
+  for (const [step, el] of patternStepEls) {
+    el.addEventListener('change', () => {
+      state.pattern.steps = el.checked
+        ? [...state.pattern.steps, step]
+        : state.pattern.steps.filter((existing) => existing !== step);
+      emitChange();
+    });
+  }
+  patternDescendingEl.addEventListener('change', () => {
+    state.pattern.allowDescending = patternDescendingEl.checked;
+    emitChange();
+  });
+  patternMinEl.addEventListener('input', () => {
+    const value = Number(patternMinEl.value);
+    if (Number.isFinite(value)) {
+      state.pattern.startRange.min = value;
+      emitChange();
+    }
+  });
+  patternMaxEl.addEventListener('input', () => {
+    const value = Number(patternMaxEl.value);
+    if (Number.isFinite(value)) {
+      state.pattern.startRange.max = value;
+      emitChange();
+    }
+  });
+  patternTermCountEl.addEventListener('input', () => {
+    const value = Number(patternTermCountEl.value);
+    if (Number.isFinite(value)) {
+      state.pattern.termCount = value;
+      emitChange();
+    }
+  });
+  patternHiddenCountEl.addEventListener('input', () => {
+    const value = Number(patternHiddenCountEl.value);
+    if (Number.isFinite(value)) {
+      state.pattern.hiddenCount = value;
+      emitChange();
+    }
+  });
+
   // "Antal uppgifter"/"Undvik dubbletter" är samma synliga fält för alla tre
   // bladtyper (se activeCountable ovan).
   countEl.addEventListener('input', () => {
@@ -591,6 +664,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
       state.clock.seed = seed;
       state.fraction.seed = seed;
       state.geometry.seed = seed;
+      state.pattern.seed = seed;
       refreshFromState();
       emitChange();
     },
@@ -668,6 +742,10 @@ function renderTemplate(): string {
     .map(([value, label]) => `<option value="${value}">${label}</option>`)
     .join('');
 
+  const patternStepCheckboxes = PATTERN_STEP_OPTIONS.map(
+    (step) => `<label><input type="checkbox" id="pattern-step-${step}" /> ${step}</label>`,
+  ).join('');
+
   return `
     <section aria-labelledby="sheettype-heading">
       <h2 id="sheettype-heading">Typ av blad</h2>
@@ -676,6 +754,7 @@ function renderTemplate(): string {
         <label><input type="radio" name="sheetType" value="clock" /> Klockan</label>
         <label><input type="radio" name="sheetType" value="fraction" /> Bråk</label>
         <label><input type="radio" name="sheetType" value="geometry" /> Geometri</label>
+        <label><input type="radio" name="sheetType" value="pattern" /> Talmönster</label>
       </div>
     </section>
 
@@ -755,6 +834,23 @@ function renderTemplate(): string {
         <label>Till <input type="number" id="geometry-max" min="1" step="1" /></label>
       </div>
       <label><input type="checkbox" id="geometry-showUnits" /> Visa enheter (cm och cm²)</label>
+    </section>
+
+    <section aria-labelledby="pattern-heading" id="pattern-section">
+      <h2 id="pattern-heading">Talmönster</h2>
+      <div class="field-grid" id="pattern-steps">
+        <span class="level-chips-label">Steg:</span>
+        ${patternStepCheckboxes}
+      </div>
+      <label><input type="checkbox" id="pattern-descending" /> Tillåt nedåtgående följder</label>
+      <div class="op-range">
+        <label>Starttal från <input type="number" id="pattern-min" step="1" /></label>
+        <label>Till <input type="number" id="pattern-max" step="1" /></label>
+      </div>
+      <div class="op-range">
+        <label>Antal termer <input type="number" id="pattern-termCount" min="4" step="1" /></label>
+        <label>Antal dolda <input type="number" id="pattern-hiddenCount" min="1" step="1" /></label>
+      </div>
     </section>
 
     <section aria-labelledby="sheet-heading">

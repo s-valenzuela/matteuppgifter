@@ -153,6 +153,32 @@ export const PRESETS: Preset[] = [
       return state;
     },
   },
+  {
+    id: 'pattern-ascending',
+    label: 'Talföljder uppåt',
+    build: () => {
+      const state = createDefaultState();
+      state.sheetType = 'pattern';
+      state.pattern.steps = [1, 2, 5, 10];
+      state.pattern.allowDescending = false;
+      state.document.header.title = 'Talföljder — uppåt';
+      state.document.header.instructions = computeDefaultInstructions(state);
+      return state;
+    },
+  },
+  {
+    id: 'pattern-mixed',
+    label: 'Talföljder blandat',
+    build: () => {
+      const state = createDefaultState();
+      state.sheetType = 'pattern';
+      state.pattern.steps = [1, 2, 3, 5, 10];
+      state.pattern.allowDescending = true;
+      state.document.header.title = 'Talföljder — blandat';
+      state.document.header.instructions = computeDefaultInstructions(state);
+      return state;
+    },
+  },
 ];
 
 /** Nivå-chips: sätter samma talområde på alla fyra räknesätt, oavsett om de är aktiverade. */
