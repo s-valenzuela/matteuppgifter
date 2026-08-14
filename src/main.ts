@@ -201,7 +201,7 @@ async function handlePrint(): Promise<void> {
   // output('bloburl') returnerar i praktiken en sträng, trots vad jsPDF:s
   // typer säger — se kommentaren i ui/preview.ts.
   const url = doc.output('bloburl') as unknown as string;
-  window.open(url, '_blank');
+  window.open(url, '_blank', 'noopener');
 }
 
 copyLinkButton.addEventListener('click', () => {
