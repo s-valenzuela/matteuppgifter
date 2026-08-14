@@ -20,6 +20,8 @@ const RIGHT_ANGLE_MARK_MM = 2.6;
 const FIGURE_INSET_FACTOR = 0.74;
 /** Avstånd mellan figurens kant och måttetiketten, i mm. */
 const LABEL_GAP_MM = 1.8;
+/** Liten extra luft utöver den beräknade etiketthöjden, se bottomLabelReachMm. */
+const BOTTOM_LABEL_SAFETY_MM = 0.5;
 /** Grundavstånd mellan hypotenusan och dess etikett, utöver den skalning med
  * etikettens egen storlek som drawPerimeterTriangleFigure lägger på. */
 const HYPOTENUSE_LABEL_OFFSET_MM = 1.6;
@@ -50,29 +52,75 @@ export function drawGeometryFigure(
   const box = size * FIGURE_INSET_FACTOR;
   const centerY = topY + size / 2;
 
+  // Rektangeln och triangeln har en BOTTEN-etikett (bredden/basen) som ritas
+  // UTANFÖR figuren, strax under dess nederkant — till skillnad från
+  // sido-etiketterna (höjd, radie) krävs alltså garanterat utrymme rakt
+  // NEDANFÖR figuren, inte bara runt om den. `box` (den symmetriska
+  // indragningen ovan) räcker inte för det: en HÖG figur (höjd ≥ bredd) fyller
+  // hela `box` på höjden och lämnar bara den lilla marginalen mellan `box` och
+  // `size` åt botten-etiketten — vid vanliga teckenstorlekar är den marginalen
+  // tunnare än etiketten själv, så etiketten hamnar klämd mot svarsraden
+  // (position.yMm i render.ts, som ligger GEOMETRY_FIGURE_LABEL_GAP_MM under
+  // `size`). maxHeightMm nedan begränsar därför figurens höjd separat från
+  // dess bredd, med tillräcklig marginal reserverad symmetriskt upptill och
+  // nedtill för att botten-etiketten alltid ska få plats innan `size`.
+  const reach = bottomLabelReachMm(labelFontPt);
+  const maxHeightMm = Math.max(size - 2 * reach, size * 0.3);
+
   doc.setDrawColor(0);
   doc.setLineWidth(OUTLINE_LINE_WIDTH_MM);
 
   switch (problem.shape) {
     case 'rectangle':
-      drawRectangleFigure(doc, problem, centerX, centerY, box, showUnits, labelFontPt);
+      drawRectangleFigure(doc, problem, centerX, centerY, box, maxHeightMm, showUnits, labelFontPt);
       return;
     case 'circle':
       drawCircleFigure(doc, problem, centerX, centerY, box, showUnits, labelFontPt);
       return;
     case 'triangle':
       if (problem.measure === 'area') {
-        drawAreaTriangleFigure(doc, problem, centerX, centerY, box, showUnits, labelFontPt);
+        drawAreaTriangleFigure(
+          doc,
+          problem,
+          centerX,
+          centerY,
+          box,
+          maxHeightMm,
+          showUnits,
+          labelFontPt,
+        );
       } else {
-        drawPerimeterTriangleFigure(doc, problem, centerX, centerY, box, showUnits, labelFontPt);
+        drawPerimeterTriangleFigure(
+          doc,
+          problem,
+          centerX,
+          centerY,
+          box,
+          maxHeightMm,
+          showUnits,
+          labelFontPt,
+        );
       }
       return;
   }
 }
 
-/** Skalfaktor så att den största av bredd/höjd fyller `box`. */
-function scaleFor(widthUnits: number, heightUnits: number, box: number): number {
-  return box / Math.max(widthUnits, heightUnits);
+/** Skalfaktor så att figuren fyller `maxWidthMm`/`maxHeightMm` så mycket som
+ * möjligt utan att sticka ut ur någotdera — den snävare av de två vinner. */
+function scaleFor(
+  widthUnits: number,
+  heightUnits: number,
+  maxWidthMm: number,
+  maxHeightMm: number,
+): number {
+  return Math.min(maxWidthMm / widthUnits, maxHeightMm / heightUnits);
+}
+
+/** Hur mycket vertikalt utrymme en botten-etikett (rektangelns bredd,
+ * triangelns bas) behöver under figuren, för att aldrig hamna klämd mot
+ * svarsraden — se kommentaren i drawGeometryFigure. */
+function bottomLabelReachMm(labelFontPt: number): number {
+  return LABEL_GAP_MM + labelHeightMm(labelFontPt) + BOTTOM_LABEL_SAFETY_MM;
 }
 
 function measureLabel(value: number, showUnits: boolean): string {
@@ -120,10 +168,11 @@ function drawRectangleFigure(
   centerX: number,
   centerY: number,
   box: number,
+  maxHeightMm: number,
   showUnits: boolean,
   labelFontPt: number,
 ): void {
-  const scale = scaleFor(problem.widthCm, problem.heightCm, box);
+  const scale = scaleFor(problem.widthCm, problem.heightCm, box, maxHeightMm);
   const width = problem.widthCm * scale;
   const height = problem.heightCm * scale;
   const left = centerX - width / 2;
@@ -189,10 +238,11 @@ function drawAreaTriangleFigure(
   centerX: number,
   centerY: number,
   box: number,
+  maxHeightMm: number,
   showUnits: boolean,
   labelFontPt: number,
 ): void {
-  const scale = scaleFor(problem.baseCm, problem.heightCm, box);
+  const scale = scaleFor(problem.baseCm, problem.heightCm, box, maxHeightMm);
   const base = problem.baseCm * scale;
   const height = problem.heightCm * scale;
   const left = centerX - base / 2;
@@ -251,11 +301,12 @@ function drawPerimeterTriangleFigure(
   centerX: number,
   centerY: number,
   box: number,
+  maxHeightMm: number,
   showUnits: boolean,
   labelFontPt: number,
 ): void {
   const [aCm, bCm, cCm] = problem.sidesCm;
-  const scale = scaleFor(aCm, bCm, box);
+  const scale = scaleFor(aCm, bCm, box, maxHeightMm);
   const base = aCm * scale;
   const height = bCm * scale;
   const left = centerX - base / 2;
