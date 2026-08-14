@@ -3,21 +3,25 @@ import { generateClockProblems } from '../src/core/clock';
 import { FRACTION_DENOMINATORS, generateFractionProblems } from '../src/core/fractions';
 import { generateProblems } from '../src/core/generate';
 import { generateGeometryProblems } from '../src/core/geometry';
+import { generatePatternProblems } from '../src/core/patterns';
 import { A4_METRICS, computeGridLayout, computeHeaderHeightMm } from '../src/pdf/layout';
 import {
   renderClockSheetToPdf,
   renderFractionSheetToPdf,
   renderGeometrySheetToPdf,
+  renderPatternSheetToPdf,
   renderProblemsToPdf,
   type ClockDocumentOptions,
   type FractionDocumentOptions,
   type GeometryDocumentOptions,
+  type PatternDocumentOptions,
 } from '../src/pdf/render';
 import type {
   ClockGeneratorConfig,
   DocumentConfig,
   FractionGeneratorConfig,
   GeometryGeneratorConfig,
+  PatternGeneratorConfig,
 } from '../src/types';
 import { baseConfig, opConfig } from './helpers';
 
@@ -755,6 +759,131 @@ describe('renderGeometrySheetToPdf', () => {
       },
     });
     const doc = renderGeometrySheetToPdf(problems, config, geometryOptions());
+    expect(doc.getNumberOfPages()).toBe(2);
+    expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+  });
+});
+
+describe('renderPatternSheetToPdf', () => {
+  function basePatternConfig(
+    overrides: Partial<PatternGeneratorConfig> = {},
+  ): PatternGeneratorConfig {
+    return {
+      startRange: { min: 0, max: 20 },
+      steps: [1, 2],
+      allowDescending: false,
+      termCount: 6,
+      hiddenCount: 2,
+      count: 9,
+      avoidDuplicates: true,
+      seed: 1,
+      ...overrides,
+    };
+  }
+
+  function patternOptions(config: PatternGeneratorConfig): PatternDocumentOptions {
+    return { termCount: config.termCount };
+  }
+
+  it('genererar en icke-tom PDF för ett litet mönsterblad', () => {
+    const config = basePatternConfig();
+    const problems = generatePatternProblems(config);
+    const doc = renderPatternSheetToPdf(problems, baseDocumentConfig(), patternOptions(config));
+    expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+    expect(doc.getNumberOfPages()).toBe(1);
+  });
+
+  it('lämnar en enda tom sida med bara rubriken när inga uppgifter finns', () => {
+    const config = basePatternConfig();
+    const doc = renderPatternSheetToPdf([], baseDocumentConfig(), patternOptions(config));
+    expect(doc.getNumberOfPages()).toBe(1);
+  });
+
+  it('matchar sidantalet från layout-beräkningen för mönsterläget', () => {
+    const config = basePatternConfig({ count: 60, avoidDuplicates: false });
+    const problems = generatePatternProblems(config);
+    const docConfig = baseDocumentConfig({ columns: 3, fontSizePt: 14 });
+    const layout = computeGridLayout({
+      problemCount: problems.length,
+      fontSizePt: docConfig.fontSizePt,
+      columns: docConfig.columns,
+      layout: 'pattern',
+      termCount: config.termCount,
+    });
+
+    const doc = renderPatternSheetToPdf(problems, docConfig, patternOptions(config));
+    expect(doc.getNumberOfPages()).toBe(layout.pageCount);
+  });
+
+  it('lägger till facit-sidor sist när includeAnswerKey är satt', () => {
+    const config = basePatternConfig({ count: 60, avoidDuplicates: false });
+    const problems = generatePatternProblems(config);
+    const docConfig = baseDocumentConfig({ columns: 3, fontSizePt: 14 });
+    const layout = computeGridLayout({
+      problemCount: problems.length,
+      fontSizePt: docConfig.fontSizePt,
+      columns: docConfig.columns,
+      layout: 'pattern',
+      termCount: config.termCount,
+    });
+
+    const withoutKey = renderPatternSheetToPdf(problems, docConfig, patternOptions(config));
+    const withKey = renderPatternSheetToPdf(
+      problems,
+      { ...docConfig, includeAnswerKey: true },
+      patternOptions(config),
+    );
+
+    expect(withoutKey.getNumberOfPages()).toBe(layout.pageCount);
+    expect(withKey.getNumberOfPages()).toBe(layout.pageCount * 2);
+  });
+
+  it('fungerar för olika termCount/hiddenCount, svarsstilar och stegval, med facit, utan att kasta fel', () => {
+    for (const termCount of [4, 6, 10]) {
+      for (const hiddenCount of [1, 2, 3]) {
+        for (const answerStyle of ['blank', 'line', 'box'] as const) {
+          const config = basePatternConfig({ termCount, hiddenCount, count: 12 });
+          const problems = generatePatternProblems(config);
+          const doc = renderPatternSheetToPdf(
+            problems,
+            baseDocumentConfig({ answerStyle, includeAnswerKey: true }),
+            patternOptions(config),
+          );
+          expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('fungerar för smala kolumner och extrema teckenstorlekar utan att kasta fel', () => {
+    const config = basePatternConfig({ count: 12 });
+    const problems = generatePatternProblems(config);
+    for (const columns of [1, 2, 4, 6] as const) {
+      for (const fontSizePt of [10, 14, 24, 32]) {
+        const doc = renderPatternSheetToPdf(
+          problems,
+          baseDocumentConfig({ columns, fontSizePt }),
+          patternOptions(config),
+        );
+        expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('respekterar instruktionsrad och löst exempel, precis som de andra bladtyperna', () => {
+    const config = basePatternConfig({ count: 9 });
+    const problems = generatePatternProblems(config);
+    const docConfig = baseDocumentConfig({
+      exampleFirst: true,
+      includeAnswerKey: true,
+      header: {
+        title: 'Matteuppgifter',
+        showName: true,
+        showDate: true,
+        instructions: 'Fyll i de tal som saknas i talföljden.',
+      },
+    });
+    const doc = renderPatternSheetToPdf(problems, docConfig, patternOptions(config));
     expect(doc.getNumberOfPages()).toBe(2);
     expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
   });

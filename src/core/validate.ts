@@ -1,6 +1,7 @@
 import { clockPoolSize } from './clock';
 import { fractionPoolSize, FRACTION_DENOMINATORS } from './fractions';
 import { geometryPoolSize } from './geometry';
+import { patternPoolSize } from './patterns';
 import type {
   ClockGeneratorConfig,
   ClockStep,
@@ -9,6 +10,7 @@ import type {
   GeometryGeneratorConfig,
   Operation,
   OperationConfig,
+  PatternGeneratorConfig,
   Range,
 } from '../types';
 
@@ -29,6 +31,11 @@ export interface FractionValidationResult {
 
 export interface GeometryValidationResult {
   config: GeometryGeneratorConfig;
+  warnings: string[];
+}
+
+export interface PatternValidationResult {
+  config: PatternGeneratorConfig;
   warnings: string[];
 }
 
@@ -164,6 +171,57 @@ export function validateGeometryConfig(input: GeometryGeneratorConfig): Geometry
     if (poolSize < count) {
       warnings.push(
         `De valda inställningarna rymmer bara ca ${poolSize} unika uppgifter, men ${count} ` +
+          'efterfrågas — uppgifter kommer att upprepas.',
+      );
+    }
+  }
+
+  return { config, warnings };
+}
+
+/** Motsvarigheten till validateGeometryConfig för mönsterblad — se
+ * kommentaren där. Termerna 0 och 1 är alltid synliga (se
+ * core/patterns.ts), så termCount måste rymma minst 2 dolda platser utöver
+ * dem och hiddenCount får aldrig överstiga det. */
+export function validatePatternConfig(input: PatternGeneratorConfig): PatternValidationResult {
+  const warnings: string[] = [];
+  const count = normalizeCount(input.count);
+  if (count !== input.count) {
+    warnings.push('Antalet uppgifter justerades till ett positivt heltal.');
+  }
+
+  const startRange = normalizeRange(input.startRange);
+
+  const steps = input.steps.length > 0 ? input.steps : [1];
+  if (steps !== input.steps) {
+    warnings.push('Minst ett steg måste vara ikryssat — steget 1 valdes automatiskt.');
+  }
+
+  const termCount = Math.max(4, Math.floor(input.termCount));
+  if (termCount !== input.termCount) {
+    warnings.push('Antalet termer justerades till minst 4.');
+  }
+
+  const maxHidden = Math.max(1, termCount - 2);
+  const hiddenCount = Math.min(Math.max(1, Math.floor(input.hiddenCount)), maxHidden);
+  if (hiddenCount !== input.hiddenCount) {
+    warnings.push(`Antalet dolda termer justerades till mellan 1 och ${maxHidden}.`);
+  }
+
+  const config: PatternGeneratorConfig = {
+    ...input,
+    startRange,
+    steps,
+    termCount,
+    hiddenCount,
+    count,
+  };
+
+  if (input.avoidDuplicates && count > 0) {
+    const poolSize = patternPoolSize(config);
+    if (poolSize < count) {
+      warnings.push(
+        `De valda inställningarna rymmer bara ca ${poolSize} unika talföljder, men ${count} ` +
           'efterfrågas — uppgifter kommer att upprepas.',
       );
     }

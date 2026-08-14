@@ -79,6 +79,19 @@ describe('saveState / loadState', () => {
     expect(loaded?.document.header.title).toBe(legacyState.document.header.title);
   });
 
+  it('fyller på pattern för ett tillstånd sparat innan mönsterbladet fanns', () => {
+    // Samma klass av problem som klock-testet ovan, men för fältet som
+    // tillkom med mönsterbladet.
+    const legacyState = createDefaultState();
+    // @ts-expect-error simulerar JSON sparat innan pattern fanns
+    delete legacyState.pattern;
+    localStorage.setItem('matteuppgifter:state:v1', JSON.stringify(legacyState));
+
+    const loaded = loadState();
+    expect(loaded?.pattern).toBeDefined();
+    expect(loaded?.pattern.steps).toEqual(createDefaultState().pattern.steps);
+  });
+
   it('behåller egna document-värden som skiljer sig från standardvärdena', () => {
     const state = createDefaultState();
     state.document.header.title = 'Läxa vecka 7';

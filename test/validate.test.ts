@@ -5,11 +5,13 @@ import {
   validateConfig,
   validateFractionConfig,
   validateGeometryConfig,
+  validatePatternConfig,
 } from '../src/core/validate';
 import type {
   ClockGeneratorConfig,
   FractionGeneratorConfig,
   GeometryGeneratorConfig,
+  PatternGeneratorConfig,
 } from '../src/types';
 import { baseConfig, opConfig } from './helpers';
 
@@ -254,6 +256,73 @@ describe('validateGeometryConfig', () => {
 
   it('varnar inte för en rimlig konfiguration', () => {
     const { warnings } = validateGeometryConfig(baseGeometryConfig());
+    expect(warnings).toEqual([]);
+  });
+});
+
+describe('validatePatternConfig', () => {
+  function basePatternConfig(
+    overrides: Partial<PatternGeneratorConfig> = {},
+  ): PatternGeneratorConfig {
+    return {
+      startRange: { min: 0, max: 20 },
+      steps: [1, 2],
+      allowDescending: false,
+      termCount: 6,
+      hiddenCount: 2,
+      count: 10,
+      avoidDuplicates: true,
+      seed: 1,
+      ...overrides,
+    };
+  }
+
+  it('rätar ut ett negativt antal uppgifter och varnar', () => {
+    const { config, warnings } = validatePatternConfig(basePatternConfig({ count: -3 }));
+    expect(config.count).toBe(0);
+    expect(warnings.some((w) => w.includes('Antalet uppgifter'))).toBe(true);
+  });
+
+  it('faller tillbaka till steget [1] och varnar när ingen är ikryssad', () => {
+    const { config, warnings } = validatePatternConfig(basePatternConfig({ steps: [] }));
+    expect(config.steps).toEqual([1]);
+    expect(warnings.some((w) => w.includes('steg'))).toBe(true);
+  });
+
+  it('höjer termCount till minst 4 och varnar', () => {
+    const { config, warnings } = validatePatternConfig(basePatternConfig({ termCount: 2 }));
+    expect(config.termCount).toBeGreaterThanOrEqual(4);
+    expect(warnings.some((w) => w.includes('termer'))).toBe(true);
+  });
+
+  it('klämmer hiddenCount mellan 1 och termCount - 2, och varnar', () => {
+    const { config, warnings } = validatePatternConfig(
+      basePatternConfig({ termCount: 6, hiddenCount: 99 }),
+    );
+    expect(config.hiddenCount).toBeLessThanOrEqual(4);
+    expect(config.hiddenCount).toBeGreaterThanOrEqual(1);
+    expect(warnings.some((w) => w.includes('dolda termer'))).toBe(true);
+
+    const zero = validatePatternConfig(basePatternConfig({ termCount: 6, hiddenCount: 0 }));
+    expect(zero.config.hiddenCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it('vänder ett omvänt startRange rätt', () => {
+    const { config } = validatePatternConfig(
+      basePatternConfig({ startRange: { min: 12, max: 3 } }),
+    );
+    expect(config.startRange.min).toBeLessThanOrEqual(config.startRange.max);
+  });
+
+  it('varnar när fler unika talföljder begärs än inställningarna rymmer', () => {
+    const { warnings } = validatePatternConfig(
+      basePatternConfig({ startRange: { min: 1, max: 3 }, steps: [1], count: 40 }),
+    );
+    expect(warnings.some((w) => w.includes('unika talföljder'))).toBe(true);
+  });
+
+  it('varnar inte för en rimlig konfiguration', () => {
+    const { warnings } = validatePatternConfig(basePatternConfig());
     expect(warnings).toEqual([]);
   });
 });

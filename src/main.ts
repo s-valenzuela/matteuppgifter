@@ -4,11 +4,13 @@ import { generateClockProblems } from './core/clock';
 import { generateFractionProblems } from './core/fractions';
 import { generateProblems } from './core/generate';
 import { generateGeometryProblems } from './core/geometry';
+import { generatePatternProblems } from './core/patterns';
 import {
   validateClockConfig,
   validateConfig,
   validateFractionConfig,
   validateGeometryConfig,
+  validatePatternConfig,
 } from './core/validate';
 import type * as RenderModule from './pdf/render';
 import { decodeState, encodeState } from './state/urlState';
@@ -123,6 +125,19 @@ async function regenerate(state: AppState): Promise<void> {
     return;
   }
 
+  if (state.sheetType === 'pattern') {
+    const { config, warnings } = validatePatternConfig(state.pattern);
+    renderWarnings(warnings);
+    preview.update(() =>
+      render.renderPatternSheetToPdf(
+        generatePatternProblems(config),
+        toDocumentConfig(state),
+        config,
+      ),
+    );
+    return;
+  }
+
   const { config, warnings } = validateConfig(state.generator);
   renderWarnings(warnings);
   preview.update(() =>
@@ -166,6 +181,14 @@ async function buildCurrentPdf(): Promise<jsPDF> {
     const { config } = validateGeometryConfig(state.geometry);
     return render.renderGeometrySheetToPdf(
       generateGeometryProblems(config),
+      toDocumentConfig(state),
+      config,
+    );
+  }
+  if (state.sheetType === 'pattern') {
+    const { config } = validatePatternConfig(state.pattern);
+    return render.renderPatternSheetToPdf(
+      generatePatternProblems(config),
       toDocumentConfig(state),
       config,
     );

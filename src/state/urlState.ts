@@ -18,7 +18,13 @@ import { createDefaultState, type AppState } from '../ui/state';
 const OPERATION_KEYS: readonly Operation[] = ['add', 'sub', 'mul', 'div'];
 const ANSWER_STYLES: readonly AnswerStyle[] = ['blank', 'line', 'box'];
 const DOCUMENT_LAYOUTS: readonly DocumentLayout[] = ['grid', 'vertical'];
-const SHEET_TYPES: readonly SheetType[] = ['arithmetic', 'clock', 'fraction', 'geometry'];
+const SHEET_TYPES: readonly SheetType[] = [
+  'arithmetic',
+  'clock',
+  'fraction',
+  'geometry',
+  'pattern',
+];
 const CLOCK_STEPS: readonly ClockStep[] = ['hour', 'half', 'quarter', 'five'];
 const CLOCK_DIRECTIONS: readonly ClockDirectionMode[] = [
   'read',
@@ -108,6 +114,16 @@ export function encodeState(state: AppState): URLSearchParams {
   params.set('gdup', boolStr(state.geometry.avoidDuplicates));
   params.set('gseed', String(state.geometry.seed));
 
+  params.set('psteps', state.pattern.steps.join(','));
+  params.set('pdesc', boolStr(state.pattern.allowDescending));
+  params.set('pmin', String(state.pattern.startRange.min));
+  params.set('pmax', String(state.pattern.startRange.max));
+  params.set('pterms', String(state.pattern.termCount));
+  params.set('phidden', String(state.pattern.hiddenCount));
+  params.set('pn', String(state.pattern.count));
+  params.set('pdup', boolStr(state.pattern.avoidDuplicates));
+  params.set('pseed', String(state.pattern.seed));
+
   return params;
 }
 
@@ -185,6 +201,18 @@ export function decodeState(search: string): AppState | null {
   state.geometry.count = intOr(params.get('gn'), fallback.geometry.count);
   state.geometry.avoidDuplicates = boolOr(params.get('gdup'), fallback.geometry.avoidDuplicates);
   state.geometry.seed = intOr(params.get('gseed'), fallback.geometry.seed);
+
+  state.pattern.steps = decodePatternSteps(params.get('psteps'), fallback.pattern.steps);
+  state.pattern.allowDescending = boolOr(params.get('pdesc'), fallback.pattern.allowDescending);
+  state.pattern.startRange = {
+    min: intOr(params.get('pmin'), fallback.pattern.startRange.min),
+    max: intOr(params.get('pmax'), fallback.pattern.startRange.max),
+  };
+  state.pattern.termCount = intOr(params.get('pterms'), fallback.pattern.termCount);
+  state.pattern.hiddenCount = intOr(params.get('phidden'), fallback.pattern.hiddenCount);
+  state.pattern.count = intOr(params.get('pn'), fallback.pattern.count);
+  state.pattern.avoidDuplicates = boolOr(params.get('pdup'), fallback.pattern.avoidDuplicates);
+  state.pattern.seed = intOr(params.get('pseed'), fallback.pattern.seed);
 
   return state;
 }
@@ -268,6 +296,19 @@ function decodeGeometryMeasure(
   return raw !== null && (GEOMETRY_MEASURES as readonly string[]).includes(raw)
     ? (raw as GeometryMeasureMode)
     : fallback;
+}
+
+/** Kommaseparerad lista av ikryssade steg, samma princip som
+ * decodeClockSteps/decodeFractionDenominators — men utan en fast
+ * whitelist, eftersom steg är fritt valda positiva heltal (inte ett
+ * begränsat urval som minutgrupper eller nämnare). */
+function decodePatternSteps(raw: string | null, fallback: number[]): number[] {
+  if (raw === null) return fallback;
+  const steps = raw
+    .split(',')
+    .map((part) => Number(part))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  return steps.length > 0 ? steps : fallback;
 }
 
 function encodeOperation(key: Operation, cfg: OperationConfig): string {

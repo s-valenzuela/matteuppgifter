@@ -345,6 +345,67 @@ describe('computeGridLayout', () => {
     });
   });
 
+  describe('mönsterläge (layout: "pattern")', () => {
+    it('placerar aldrig innehåll utanför marginalerna, för olika termCount', () => {
+      for (const termCount of [4, 6, 10]) {
+        for (const columns of ['auto', 1, 2, 4] as const) {
+          const layout = computeGridLayout({
+            problemCount: 20,
+            fontSizePt: 14,
+            columns,
+            layout: 'pattern',
+            termCount,
+          });
+          for (const p of layout.positions) {
+            expect(p.xMm).toBeGreaterThanOrEqual(A4_METRICS.marginMm);
+            expect(p.xMm + layout.columnWidthMm).toBeLessThanOrEqual(
+              A4_METRICS.pageWidthMm - A4_METRICS.marginMm + 1e-9,
+            );
+          }
+        }
+      }
+    });
+
+    it('ett större termCount ger färre (eller lika många) auto-kolumner, för samma bredd', () => {
+      const fewTerms = computeGridLayout({
+        problemCount: 20,
+        fontSizePt: 14,
+        columns: 'auto',
+        layout: 'pattern',
+        termCount: 4,
+      });
+      const manyTerms = computeGridLayout({
+        problemCount: 20,
+        fontSizePt: 14,
+        columns: 'auto',
+        layout: 'pattern',
+        termCount: 12,
+      });
+      expect(manyTerms.columns).toBeLessThanOrEqual(fewTerms.columns);
+    });
+
+    it('fungerar utan termCount (faller tillbaka till ett standardvärde i stället för att krascha)', () => {
+      const layout = computeGridLayout({
+        problemCount: 10,
+        fontSizePt: 14,
+        columns: 'auto',
+        layout: 'pattern',
+      });
+      expect(layout.columns).toBeGreaterThan(0);
+    });
+
+    it('fördelar uppgifter över rätt antal sidor', () => {
+      const layout = computeGridLayout({
+        problemCount: 30,
+        fontSizePt: 14,
+        columns: 3,
+        layout: 'pattern',
+        termCount: 6,
+      });
+      expect(layout.pageCount).toBe(Math.ceil(30 / layout.problemsPerPage));
+    });
+  });
+
   describe('computeHeaderHeightMm', () => {
     it('ger tillbaka bashöjden oförändrad utan extra rader', () => {
       expect(computeHeaderHeightMm(A4_METRICS.headerHeightMm, 0)).toBe(A4_METRICS.headerHeightMm);
