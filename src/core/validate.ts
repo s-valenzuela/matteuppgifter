@@ -1,10 +1,12 @@
 import { clockPoolSize } from './clock';
+import { equationPoolSize } from './equations';
 import { fractionPoolSize, FRACTION_DENOMINATORS } from './fractions';
 import { geometryPoolSize } from './geometry';
 import { patternPoolSize } from './patterns';
 import type {
   ClockGeneratorConfig,
   ClockStep,
+  EquationGeneratorConfig,
   FractionGeneratorConfig,
   GeneratorConfig,
   GeometryGeneratorConfig,
@@ -36,6 +38,11 @@ export interface GeometryValidationResult {
 
 export interface PatternValidationResult {
   config: PatternGeneratorConfig;
+  warnings: string[];
+}
+
+export interface EquationValidationResult {
+  config: EquationGeneratorConfig;
   warnings: string[];
 }
 
@@ -222,6 +229,49 @@ export function validatePatternConfig(input: PatternGeneratorConfig): PatternVal
     if (poolSize < count) {
       warnings.push(
         `De valda inställningarna rymmer bara ca ${poolSize} unika talföljder, men ${count} ` +
+          'efterfrågas — uppgifter kommer att upprepas.',
+      );
+    }
+  }
+
+  return { config, warnings };
+}
+
+/** Motsvarigheten till validateGeometryConfig för ekvationsblad — se
+ * kommentaren där. operandRange klampas till ≥ 1 (inte ≥ 0) eftersom
+ * division alltid behöver en divisor skild från 0, se core/equations.ts. */
+export function validateEquationConfig(input: EquationGeneratorConfig): EquationValidationResult {
+  const warnings: string[] = [];
+  const count = normalizeCount(input.count);
+  if (count !== input.count) {
+    warnings.push('Antalet uppgifter justerades till ett positivt heltal.');
+  }
+
+  const enabledOps = (Object.keys(input.operations) as Operation[]).filter(
+    (op) => input.operations[op],
+  );
+  const operations =
+    enabledOps.length > 0 ? input.operations : { add: true, sub: false, mul: false, div: false };
+  if (enabledOps.length === 0) {
+    warnings.push('Inget räknesätt är valt — addition valdes automatiskt.');
+  }
+
+  const normalized = normalizeRange(input.operandRange);
+  const operandRange: Range = {
+    min: Math.max(1, normalized.min),
+    max: Math.max(1, normalized.max),
+  };
+  if (operandRange.min !== input.operandRange.min || operandRange.max !== input.operandRange.max) {
+    warnings.push('Talområdet justerades till positiva heltal (minst 1).');
+  }
+
+  const config: EquationGeneratorConfig = { ...input, operations, operandRange, count };
+
+  if (input.avoidDuplicates && count > 0) {
+    const poolSize = equationPoolSize(config);
+    if (poolSize < count) {
+      warnings.push(
+        `De valda inställningarna rymmer bara ca ${poolSize} unika ekvationer, men ${count} ` +
           'efterfrågas — uppgifter kommer att upprepas.',
       );
     }

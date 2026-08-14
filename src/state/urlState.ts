@@ -24,6 +24,7 @@ const SHEET_TYPES: readonly SheetType[] = [
   'fraction',
   'geometry',
   'pattern',
+  'equation',
 ];
 const CLOCK_STEPS: readonly ClockStep[] = ['hour', 'half', 'quarter', 'five'];
 const CLOCK_DIRECTIONS: readonly ClockDirectionMode[] = [
@@ -124,6 +125,15 @@ export function encodeState(state: AppState): URLSearchParams {
   params.set('pdup', boolStr(state.pattern.avoidDuplicates));
   params.set('pseed', String(state.pattern.seed));
 
+  const enabledEquationOps = OPERATION_KEYS.filter((key) => state.equation.operations[key]);
+  params.set('eops', enabledEquationOps.join(','));
+  params.set('emin', String(state.equation.operandRange.min));
+  params.set('emax', String(state.equation.operandRange.max));
+  params.set('eneg', boolStr(state.equation.allowNegative));
+  params.set('en', String(state.equation.count));
+  params.set('edup', boolStr(state.equation.avoidDuplicates));
+  params.set('eseed', String(state.equation.seed));
+
   return params;
 }
 
@@ -213,6 +223,19 @@ export function decodeState(search: string): AppState | null {
   state.pattern.count = intOr(params.get('pn'), fallback.pattern.count);
   state.pattern.avoidDuplicates = boolOr(params.get('pdup'), fallback.pattern.avoidDuplicates);
   state.pattern.seed = intOr(params.get('pseed'), fallback.pattern.seed);
+
+  state.equation.operations = decodeEquationOperations(
+    params.get('eops'),
+    fallback.equation.operations,
+  );
+  state.equation.operandRange = {
+    min: intOr(params.get('emin'), fallback.equation.operandRange.min),
+    max: intOr(params.get('emax'), fallback.equation.operandRange.max),
+  };
+  state.equation.allowNegative = boolOr(params.get('eneg'), fallback.equation.allowNegative);
+  state.equation.count = intOr(params.get('en'), fallback.equation.count);
+  state.equation.avoidDuplicates = boolOr(params.get('edup'), fallback.equation.avoidDuplicates);
+  state.equation.seed = intOr(params.get('eseed'), fallback.equation.seed);
 
   return state;
 }
@@ -309,6 +332,28 @@ function decodePatternSteps(raw: string | null, fallback: number[]): number[] {
     .map((part) => Number(part))
     .filter((n) => Number.isFinite(n) && n > 0);
   return steps.length > 0 ? steps : fallback;
+}
+
+/** Kommaseparerad lista av ikryssade räknesätt för ekvationsblad, t.ex.
+ * "add,sub" — en tom eller helt ogiltig lista faller tillbaka i sin helhet,
+ * samma princip som decodeClockSteps. */
+function decodeEquationOperations(
+  raw: string | null,
+  fallback: Record<Operation, boolean>,
+): Record<Operation, boolean> {
+  if (raw === null) return fallback;
+  const enabled = new Set(
+    raw
+      .split(',')
+      .filter((part): part is Operation => (OPERATION_KEYS as readonly string[]).includes(part)),
+  );
+  if (enabled.size === 0) return fallback;
+  return {
+    add: enabled.has('add'),
+    sub: enabled.has('sub'),
+    mul: enabled.has('mul'),
+    div: enabled.has('div'),
+  };
 }
 
 function encodeOperation(key: Operation, cfg: OperationConfig): string {

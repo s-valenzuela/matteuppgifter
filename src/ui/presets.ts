@@ -179,6 +179,34 @@ export const PRESETS: Preset[] = [
       return state;
     },
   },
+  {
+    id: 'equation-add-sub',
+    label: 'Ekvationer + och −',
+    build: () => {
+      const state = createDefaultState();
+      state.sheetType = 'equation';
+      state.equation.operations = { add: true, sub: true, mul: false, div: false };
+      state.equation.operandRange = { min: 1, max: 20 };
+      state.document.answerStyle = 'line';
+      state.document.header.title = 'Ekvationer — plus och minus';
+      state.document.header.instructions = computeDefaultInstructions(state);
+      return state;
+    },
+  },
+  {
+    id: 'equation-all-operations',
+    label: 'Ekvationer alla räknesätt',
+    build: () => {
+      const state = createDefaultState();
+      state.sheetType = 'equation';
+      state.equation.operations = { add: true, sub: true, mul: true, div: true };
+      state.equation.operandRange = { min: 1, max: 12 };
+      state.document.answerStyle = 'line';
+      state.document.header.title = 'Ekvationer — alla räknesätt';
+      state.document.header.instructions = computeDefaultInstructions(state);
+      return state;
+    },
+  },
 ];
 
 /** Nivå-chips: sätter samma talområde på alla fyra räknesätt, oavsett om de är aktiverade. */

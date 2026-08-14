@@ -1,6 +1,7 @@
 import './style.css';
 import type { jsPDF } from 'jspdf';
 import { generateClockProblems } from './core/clock';
+import { generateEquationProblems } from './core/equations';
 import { generateFractionProblems } from './core/fractions';
 import { generateProblems } from './core/generate';
 import { generateGeometryProblems } from './core/geometry';
@@ -8,6 +9,7 @@ import { generatePatternProblems } from './core/patterns';
 import {
   validateClockConfig,
   validateConfig,
+  validateEquationConfig,
   validateFractionConfig,
   validateGeometryConfig,
   validatePatternConfig,
@@ -138,6 +140,15 @@ async function regenerate(state: AppState): Promise<void> {
     return;
   }
 
+  if (state.sheetType === 'equation') {
+    const { config, warnings } = validateEquationConfig(state.equation);
+    renderWarnings(warnings);
+    preview.update(() =>
+      render.renderEquationSheetToPdf(generateEquationProblems(config), toDocumentConfig(state)),
+    );
+    return;
+  }
+
   const { config, warnings } = validateConfig(state.generator);
   renderWarnings(warnings);
   preview.update(() =>
@@ -191,6 +202,13 @@ async function buildCurrentPdf(): Promise<jsPDF> {
       generatePatternProblems(config),
       toDocumentConfig(state),
       config,
+    );
+  }
+  if (state.sheetType === 'equation') {
+    const { config } = validateEquationConfig(state.equation);
+    return render.renderEquationSheetToPdf(
+      generateEquationProblems(config),
+      toDocumentConfig(state),
     );
   }
   const { config } = validateConfig(state.generator);

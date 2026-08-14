@@ -105,6 +105,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const fractionSection = q<HTMLElement>(container, '#fraction-section');
   const geometrySection = q<HTMLElement>(container, '#geometry-section');
   const patternSection = q<HTMLElement>(container, '#pattern-section');
+  const equationSection = q<HTMLElement>(container, '#equation-section');
 
   const operationEls = new Map(
     OPERATION_KEYS.map((key) => [
@@ -157,6 +158,13 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const patternTermCountEl = q<HTMLInputElement>(container, '#pattern-termCount');
   const patternHiddenCountEl = q<HTMLInputElement>(container, '#pattern-hiddenCount');
 
+  const equationOperationEls = new Map(
+    OPERATION_KEYS.map((key) => [key, q<HTMLInputElement>(container, `#equation-op-${key}`)]),
+  );
+  const equationMinEl = q<HTMLInputElement>(container, '#equation-min');
+  const equationMaxEl = q<HTMLInputElement>(container, '#equation-max');
+  const equationAllowNegativeEl = q<HTMLInputElement>(container, '#equation-allowNegative');
+
   const countEl = q<HTMLInputElement>(container, '#count');
   const avoidDuplicatesEl = q<HTMLInputElement>(container, '#avoidDuplicates');
   const shuffleEl = q<HTMLInputElement>(container, '#shuffle');
@@ -199,6 +207,10 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     return state.sheetType === 'pattern';
   }
 
+  function isEquation(): boolean {
+    return state.sheetType === 'equation';
+  }
+
   function isArithmetic(): boolean {
     return state.sheetType === 'arithmetic';
   }
@@ -213,6 +225,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     if (isFraction()) return state.fraction;
     if (isGeometry()) return state.geometry;
     if (isPattern()) return state.pattern;
+    if (isEquation()) return state.equation;
     return state.generator;
   }
 
@@ -228,6 +241,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     fractionSection.hidden = !isFraction();
     geometrySection.hidden = !isGeometry();
     patternSection.hidden = !isPattern();
+    equationSection.hidden = !isEquation();
 
     for (const key of OPERATION_KEYS) {
       const cfg = state.generator.operations[key];
@@ -277,6 +291,13 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     patternMaxEl.value = String(state.pattern.startRange.max);
     patternTermCountEl.value = String(state.pattern.termCount);
     patternHiddenCountEl.value = String(state.pattern.hiddenCount);
+
+    for (const [key, el] of equationOperationEls) {
+      el.checked = state.equation.operations[key];
+    }
+    equationMinEl.value = String(state.equation.operandRange.min);
+    equationMaxEl.value = String(state.equation.operandRange.max);
+    equationAllowNegativeEl.checked = state.equation.allowNegative;
 
     const countable = activeCountable();
     countEl.value = String(countable.count);
@@ -336,6 +357,12 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
           // ger eleven en rimlig yta att skriva på. Samma "sätts bara vid en
           // faktisk växling"-princip som bråkets ruta ovan.
           if (state.sheetType === 'geometry' && previousType !== 'geometry') {
+            state.document.answerStyle = 'line';
+          }
+          // Ekvationssvar kan vara flersiffriga och negativa ("-12"), vilket
+          // inte får plats i bråkens/räknesättens lilla ruta. Samma
+          // "sätts bara vid en faktisk växling"-princip som ovan.
+          if (state.sheetType === 'equation' && previousType !== 'equation') {
             state.document.answerStyle = 'line';
           }
         });
@@ -547,6 +574,31 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     }
   });
 
+  for (const [key, el] of equationOperationEls) {
+    el.addEventListener('change', () => {
+      state.equation.operations[key] = el.checked;
+      emitChange();
+    });
+  }
+  equationMinEl.addEventListener('input', () => {
+    const value = Number(equationMinEl.value);
+    if (Number.isFinite(value)) {
+      state.equation.operandRange.min = value;
+      emitChange();
+    }
+  });
+  equationMaxEl.addEventListener('input', () => {
+    const value = Number(equationMaxEl.value);
+    if (Number.isFinite(value)) {
+      state.equation.operandRange.max = value;
+      emitChange();
+    }
+  });
+  equationAllowNegativeEl.addEventListener('change', () => {
+    state.equation.allowNegative = equationAllowNegativeEl.checked;
+    emitChange();
+  });
+
   // "Antal uppgifter"/"Undvik dubbletter" är samma synliga fält för alla tre
   // bladtyper (se activeCountable ovan).
   countEl.addEventListener('input', () => {
@@ -665,6 +717,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
       state.fraction.seed = seed;
       state.geometry.seed = seed;
       state.pattern.seed = seed;
+      state.equation.seed = seed;
       refreshFromState();
       emitChange();
     },
@@ -746,6 +799,11 @@ function renderTemplate(): string {
     (step) => `<label><input type="checkbox" id="pattern-step-${step}" /> ${step}</label>`,
   ).join('');
 
+  const equationOperationCheckboxes = OPERATION_KEYS.map(
+    (key) =>
+      `<label><input type="checkbox" id="equation-op-${key}" /> ${OPERATION_LABELS[key]}</label>`,
+  ).join('');
+
   return `
     <section aria-labelledby="sheettype-heading">
       <h2 id="sheettype-heading">Typ av blad</h2>
@@ -755,6 +813,7 @@ function renderTemplate(): string {
         <label><input type="radio" name="sheetType" value="fraction" /> Bråk</label>
         <label><input type="radio" name="sheetType" value="geometry" /> Geometri</label>
         <label><input type="radio" name="sheetType" value="pattern" /> Talmönster</label>
+        <label><input type="radio" name="sheetType" value="equation" /> Ekvationer</label>
       </div>
     </section>
 
@@ -851,6 +910,19 @@ function renderTemplate(): string {
         <label>Antal termer <input type="number" id="pattern-termCount" min="4" step="1" /></label>
         <label>Antal dolda <input type="number" id="pattern-hiddenCount" min="1" step="1" /></label>
       </div>
+    </section>
+
+    <section aria-labelledby="equation-heading" id="equation-section">
+      <h2 id="equation-heading">Ekvationer</h2>
+      <div class="field-grid" id="equation-operations">
+        <span class="level-chips-label">Räknesätt:</span>
+        ${equationOperationCheckboxes}
+      </div>
+      <div class="op-range">
+        <label>Tal från <input type="number" id="equation-min" min="1" step="1" /></label>
+        <label>Till <input type="number" id="equation-max" min="1" step="1" /></label>
+      </div>
+      <label><input type="checkbox" id="equation-allowNegative" /> Tillåt negativa tal</label>
     </section>
 
     <section aria-labelledby="sheet-heading">

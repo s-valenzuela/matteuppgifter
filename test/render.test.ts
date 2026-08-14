@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { generateClockProblems } from '../src/core/clock';
 import { FRACTION_DENOMINATORS, generateFractionProblems } from '../src/core/fractions';
 import { generateProblems } from '../src/core/generate';
+import { generateEquationProblems } from '../src/core/equations';
 import { generateGeometryProblems } from '../src/core/geometry';
 import { generatePatternProblems } from '../src/core/patterns';
 import { A4_METRICS, computeGridLayout, computeHeaderHeightMm } from '../src/pdf/layout';
 import {
   renderClockSheetToPdf,
+  renderEquationSheetToPdf,
   renderFractionSheetToPdf,
   renderGeometrySheetToPdf,
   renderPatternSheetToPdf,
@@ -19,6 +21,7 @@ import {
 import type {
   ClockGeneratorConfig,
   DocumentConfig,
+  EquationGeneratorConfig,
   FractionGeneratorConfig,
   GeometryGeneratorConfig,
   PatternGeneratorConfig,
@@ -884,6 +887,115 @@ describe('renderPatternSheetToPdf', () => {
       },
     });
     const doc = renderPatternSheetToPdf(problems, docConfig, patternOptions(config));
+    expect(doc.getNumberOfPages()).toBe(2);
+    expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+  });
+});
+
+describe('renderEquationSheetToPdf', () => {
+  function baseEquationConfig(
+    overrides: Partial<EquationGeneratorConfig> = {},
+  ): EquationGeneratorConfig {
+    return {
+      operations: { add: true, sub: true, mul: true, div: true },
+      operandRange: { min: 1, max: 20 },
+      allowNegative: false,
+      count: 9,
+      avoidDuplicates: true,
+      seed: 1,
+      ...overrides,
+    };
+  }
+
+  it('genererar en icke-tom PDF för ett litet ekvationsblad', () => {
+    const problems = generateEquationProblems(baseEquationConfig());
+    const doc = renderEquationSheetToPdf(problems, baseDocumentConfig());
+    expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+    expect(doc.getNumberOfPages()).toBe(1);
+  });
+
+  it('lämnar en enda tom sida med bara rubriken när inga uppgifter finns', () => {
+    const doc = renderEquationSheetToPdf([], baseDocumentConfig());
+    expect(doc.getNumberOfPages()).toBe(1);
+  });
+
+  it('matchar sidantalet från layout-beräkningen för ekvationsläget', () => {
+    const problems = generateEquationProblems(
+      baseEquationConfig({ count: 60, avoidDuplicates: false }),
+    );
+    const config = baseDocumentConfig({ columns: 3, fontSizePt: 14 });
+    const layout = computeGridLayout({
+      problemCount: problems.length,
+      fontSizePt: config.fontSizePt,
+      columns: config.columns,
+      layout: 'equation',
+    });
+
+    const doc = renderEquationSheetToPdf(problems, config);
+    expect(doc.getNumberOfPages()).toBe(layout.pageCount);
+  });
+
+  it('lägger till facit-sidor sist när includeAnswerKey är satt', () => {
+    const problems = generateEquationProblems(
+      baseEquationConfig({ count: 60, avoidDuplicates: false }),
+    );
+    const config = baseDocumentConfig({ columns: 3, fontSizePt: 14 });
+    const layout = computeGridLayout({
+      problemCount: problems.length,
+      fontSizePt: config.fontSizePt,
+      columns: config.columns,
+      layout: 'equation',
+    });
+
+    const withoutKey = renderEquationSheetToPdf(problems, config);
+    const withKey = renderEquationSheetToPdf(problems, { ...config, includeAnswerKey: true });
+
+    expect(withoutKey.getNumberOfPages()).toBe(layout.pageCount);
+    expect(withKey.getNumberOfPages()).toBe(layout.pageCount * 2);
+  });
+
+  it('fungerar för alla räknesätt, svarsstilar och negativa tal, med facit, utan att kasta fel', () => {
+    for (const op of ['add', 'sub', 'mul', 'div'] as const) {
+      for (const answerStyle of ['blank', 'line', 'box'] as const) {
+        for (const allowNegative of [true, false]) {
+          const operations = { add: false, sub: false, mul: false, div: false };
+          operations[op] = true;
+          const problems = generateEquationProblems(
+            baseEquationConfig({ operations, allowNegative, count: 12 }),
+          );
+          const doc = renderEquationSheetToPdf(
+            problems,
+            baseDocumentConfig({ answerStyle, includeAnswerKey: true }),
+          );
+          expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('fungerar för smala kolumner och extrema teckenstorlekar utan att kasta fel', () => {
+    const problems = generateEquationProblems(baseEquationConfig({ count: 12 }));
+    for (const columns of [1, 2, 4, 6] as const) {
+      for (const fontSizePt of [10, 14, 24, 32]) {
+        const doc = renderEquationSheetToPdf(problems, baseDocumentConfig({ columns, fontSizePt }));
+        expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('respekterar instruktionsrad och löst exempel, precis som de andra bladtyperna', () => {
+    const problems = generateEquationProblems(baseEquationConfig({ count: 9 }));
+    const config = baseDocumentConfig({
+      exampleFirst: true,
+      includeAnswerKey: true,
+      header: {
+        title: 'Matteuppgifter',
+        showName: true,
+        showDate: true,
+        instructions: 'Lös ekvationerna. Skriv värdet på x.',
+      },
+    });
+    const doc = renderEquationSheetToPdf(problems, config);
     expect(doc.getNumberOfPages()).toBe(2);
     expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
   });

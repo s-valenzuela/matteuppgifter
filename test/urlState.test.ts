@@ -36,6 +36,7 @@ describe('encodeState / decodeState', () => {
       fraction: createDefaultState().fraction,
       geometry: createDefaultState().geometry,
       pattern: createDefaultState().pattern,
+      equation: createDefaultState().equation,
       document: {
         header: { title: 'Läxa vecka 3', showName: false, showDate: true, instructions: '' },
         fontSizePt: 20,
@@ -75,6 +76,7 @@ describe('encodeState / decodeState', () => {
       fraction: createDefaultState().fraction,
       geometry: createDefaultState().geometry,
       pattern: createDefaultState().pattern,
+      equation: createDefaultState().equation,
       document: {
         header: { title: 'Läxa vecka 3', showName: false, showDate: true, instructions: '' },
         fontSizePt: 20,
@@ -344,6 +346,47 @@ describe('encodeState / decodeState', () => {
       const state = createDefaultState();
       state.sheetType = 'pattern';
       state.pattern.seed = 111;
+      state.generator.seed = 222;
+      expect(toDocumentConfig(state).seed).toBe(111);
+    });
+  });
+
+  describe('ekvationsblad', () => {
+    it('en avkodad standardkonfiguration för ekvationsblad återskapar exakt samma AppState', () => {
+      const state = createDefaultState();
+      state.sheetType = 'equation';
+      const decoded = decodeState(`?${encodeState(state).toString()}`);
+      expect(decoded).toEqual(state);
+    });
+
+    it('kodar och avkodar alla ekvationsinställningar genom en tur-och-retur', () => {
+      const state = createDefaultState();
+      state.sheetType = 'equation';
+      state.equation = {
+        operations: { add: false, sub: true, mul: true, div: false },
+        operandRange: { min: 3, max: 15 },
+        allowNegative: true,
+        count: 24,
+        avoidDuplicates: false,
+        seed: 555,
+      };
+
+      const decoded = decodeState(`?${encodeState(state).toString()}`);
+      expect(decoded?.equation).toEqual(state.equation);
+      expect(decoded?.sheetType).toBe('equation');
+    });
+
+    it('faller tillbaka till standardvärden för skräpvärden i ekvationsfälten', () => {
+      const fallback = createDefaultState();
+      const decoded = decodeState('?add=0:10&eops=&emin=abc');
+      expect(decoded?.equation.operations).toEqual(fallback.equation.operations);
+      expect(decoded?.equation.operandRange.min).toBe(fallback.equation.operandRange.min);
+    });
+
+    it('sätter footer-seeden från equation.seed när sheetType är "equation"', () => {
+      const state = createDefaultState();
+      state.sheetType = 'equation';
+      state.equation.seed = 111;
       state.generator.seed = 222;
       expect(toDocumentConfig(state).seed).toBe(111);
     });
