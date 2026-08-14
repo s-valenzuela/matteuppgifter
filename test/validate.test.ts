@@ -3,12 +3,14 @@ import { FRACTION_DENOMINATORS } from '../src/core/fractions';
 import {
   validateClockConfig,
   validateConfig,
+  validateEquationConfig,
   validateFractionConfig,
   validateGeometryConfig,
   validatePatternConfig,
 } from '../src/core/validate';
 import type {
   ClockGeneratorConfig,
+  EquationGeneratorConfig,
   FractionGeneratorConfig,
   GeometryGeneratorConfig,
   PatternGeneratorConfig,
@@ -323,6 +325,68 @@ describe('validatePatternConfig', () => {
 
   it('varnar inte för en rimlig konfiguration', () => {
     const { warnings } = validatePatternConfig(basePatternConfig());
+    expect(warnings).toEqual([]);
+  });
+});
+
+describe('validateEquationConfig', () => {
+  function baseEquationConfig(
+    overrides: Partial<EquationGeneratorConfig> = {},
+  ): EquationGeneratorConfig {
+    return {
+      operations: { add: true, sub: true, mul: false, div: false },
+      operandRange: { min: 1, max: 20 },
+      allowNegative: false,
+      count: 12,
+      avoidDuplicates: true,
+      seed: 1,
+      ...overrides,
+    };
+  }
+
+  it('rätar ut ett negativt antal uppgifter och varnar', () => {
+    const { config, warnings } = validateEquationConfig(baseEquationConfig({ count: -3 }));
+    expect(config.count).toBe(0);
+    expect(warnings.some((w) => w.includes('Antalet uppgifter'))).toBe(true);
+  });
+
+  it('faller tillbaka till addition och varnar när inget räknesätt är valt', () => {
+    const { config, warnings } = validateEquationConfig(
+      baseEquationConfig({ operations: { add: false, sub: false, mul: false, div: false } }),
+    );
+    expect(config.operations.add).toBe(true);
+    expect(warnings.some((w) => w.includes('räknesätt'))).toBe(true);
+  });
+
+  it('höjer talområdet under 1 till 1 och varnar', () => {
+    const { config, warnings } = validateEquationConfig(
+      baseEquationConfig({ operandRange: { min: -4, max: 0 } }),
+    );
+    expect(config.operandRange.min).toBeGreaterThanOrEqual(1);
+    expect(config.operandRange.max).toBeGreaterThanOrEqual(1);
+    expect(warnings.some((w) => w.includes('Talområdet'))).toBe(true);
+  });
+
+  it('vänder ett omvänt intervall rätt', () => {
+    const { config } = validateEquationConfig(
+      baseEquationConfig({ operandRange: { min: 12, max: 3 } }),
+    );
+    expect(config.operandRange.min).toBeLessThanOrEqual(config.operandRange.max);
+  });
+
+  it('varnar när fler unika ekvationer begärs än inställningarna rymmer', () => {
+    const { warnings } = validateEquationConfig(
+      baseEquationConfig({
+        operations: { add: true, sub: false, mul: false, div: false },
+        operandRange: { min: 1, max: 2 },
+        count: 40,
+      }),
+    );
+    expect(warnings.some((w) => w.includes('unika ekvationer'))).toBe(true);
+  });
+
+  it('varnar inte för en rimlig konfiguration', () => {
+    const { warnings } = validateEquationConfig(baseEquationConfig());
     expect(warnings).toEqual([]);
   });
 });

@@ -1,9 +1,11 @@
 import { jsPDF } from 'jspdf';
 import { clockPhrase, digitalTime } from '../core/clock';
+import { equationAnswer } from '../core/equations';
 import type {
   ClockGeneratorConfig,
   ClockProblem,
   DocumentConfig,
+  EquationProblem,
   FractionGeneratorConfig,
   FractionProblem,
   GeometryGeneratorConfig,
@@ -1609,5 +1611,127 @@ function drawPatternProblem(
       doc.text(PATTERN_SEPARATOR, x, position.yMm);
       x += separatorWidth;
     }
+  });
+}
+
+/** Luft mellan figurrutan/kolumnkanten och en centrerad textrad — samma
+ * marginal som geometrins svarsrad använder, delad här av samma skäl. */
+const EQUATION_LABEL_MAX_WIDTH_MARGIN_MM = GEOMETRY_LABEL_MAX_WIDTH_MARGIN_MM;
+
+/**
+ * "x + 5" eller "12 - x" — den obekanta operanden skrivs som bokstaven x,
+ * den kända skrivs ut som siffra. Reser inte in räknesättets ² eller andra
+ * WinAnsi-känsliga tecken, bara +/−/×/÷ som redan används i OPERATION_SYMBOLS.
+ */
+function formatEquationLeftSide(problem: EquationProblem): string {
+  const symbol = OPERATION_SYMBOLS[problem.op];
+  const left = problem.unknownSlot === 'a' ? 'x' : String(problem.a);
+  const right = problem.unknownSlot === 'b' ? 'x' : String(problem.b);
+  return `${left} ${symbol} ${right}`;
+}
+
+/**
+ * Ekvationsblad delar sidhuvud/sidfot och sidbrytningslogik med de andra
+ * renderXToPdf-funktionerna, men har ett eget uppgiftsformat: en centrerad
+ * rad "x + 5 = 12   x = ____", se drawEquationProblem. Till skillnad från
+ * klockan/bråket/geometrin behöver INGEN del av EquationGeneratorConfig
+ * finnas kvar vid ritningen (bara vid genereringen), så det finns ingen
+ * EquationDocumentOptions-typ — signaturen tar bara problems och config.
+ */
+export function renderEquationSheetToPdf(
+  problems: EquationProblem[],
+  config: DocumentConfig,
+): jsPDF {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const layout = computeGridLayout({
+    problemCount: problems.length,
+    fontSizePt: config.fontSizePt,
+    columns: config.columns,
+    layout: 'equation',
+    metrics: layoutMetricsFor(config, problems.length),
+  });
+
+  if (layout.pageCount === 0) {
+    drawHeader(doc, config, null, false);
+    drawFooter(doc, 0, 1, config.seed);
+    return doc;
+  }
+
+  renderEquationSection(doc, problems, layout, config, {
+    showAnswers: false,
+    sectionLabel: null,
+  });
+
+  if (config.includeAnswerKey) {
+    doc.addPage();
+    renderEquationSection(doc, problems, layout, config, {
+      showAnswers: true,
+      sectionLabel: 'Facit',
+    });
+  }
+
+  return doc;
+}
+
+function renderEquationSection(
+  doc: jsPDF,
+  problems: EquationProblem[],
+  layout: GridLayout,
+  config: DocumentConfig,
+  options: SectionOptions,
+): void {
+  for (let page = 0; page < layout.pageCount; page++) {
+    if (page > 0) {
+      doc.addPage();
+    }
+    const showExampleNote = !options.showAnswers && config.exampleFirst && page === 0;
+    drawHeader(doc, config, options.sectionLabel, showExampleNote);
+    for (const position of layout.positions) {
+      if (position.page === page) {
+        const showAnswers = options.showAnswers || (config.exampleFirst && position.index === 0);
+        drawEquationProblem(doc, problems[position.index], position, layout, config, showAnswers);
+      }
+    }
+    drawFooter(doc, page, layout.pageCount, config.seed);
+  }
+}
+
+/**
+ * "x + 5 = 12   x = ____" (eller med svaret ifyllt i facit) — centrerad som
+ * en helhet i kolumnen, precis som geometrins "Area = ____ cm²". Facit
+ * skriver ut hela raden med x:s värde inifogat i stället för att gå via
+ * drawCenteredPromptWithBlank, samma teknik som drawGeometryProblem.
+ */
+function drawEquationProblem(
+  doc: jsPDF,
+  problem: EquationProblem,
+  position: CellPosition,
+  layout: GridLayout,
+  config: DocumentConfig,
+  showAnswers: boolean,
+): void {
+  const centerX = position.xMm + layout.columnWidthMm / 2;
+  const maxWidthMm = layout.columnWidthMm - EQUATION_LABEL_MAX_WIDTH_MARGIN_MM;
+  const leftSide = formatEquationLeftSide(problem);
+
+  if (showAnswers) {
+    drawFittedCenteredClockLabel(
+      doc,
+      `${leftSide} = ${problem.result}   x = ${equationAnswer(problem)}`,
+      centerX,
+      position.yMm,
+      maxWidthMm,
+      config.fontSizePt,
+    );
+    return;
+  }
+
+  drawCenteredPromptWithBlank(doc, {
+    centerX,
+    baselineY: position.yMm,
+    prompt: `${leftSide} = ${problem.result}   x = `,
+    answerStyle: config.answerStyle,
+    maxWidthMm,
+    basePt: config.fontSizePt,
   });
 }

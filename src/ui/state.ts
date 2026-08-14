@@ -3,6 +3,7 @@ import type {
   ClockDirectionMode,
   ClockGeneratorConfig,
   DocumentConfig,
+  EquationGeneratorConfig,
   FractionDirectionMode,
   FractionGeneratorConfig,
   GeneratorConfig,
@@ -32,6 +33,7 @@ export interface AppState {
   fraction: FractionGeneratorConfig;
   geometry: GeometryGeneratorConfig;
   pattern: PatternGeneratorConfig;
+  equation: EquationGeneratorConfig;
   document: Omit<DocumentConfig, 'seed'>;
 }
 
@@ -45,7 +47,9 @@ export function toDocumentConfig(state: AppState): DocumentConfig {
           ? state.geometry.seed
           : state.sheetType === 'pattern'
             ? state.pattern.seed
-            : state.generator.seed;
+            : state.sheetType === 'equation'
+              ? state.equation.seed
+              : state.generator.seed;
   return { ...state.document, seed };
 }
 
@@ -77,6 +81,7 @@ export function createDefaultState(): AppState {
     fraction: createDefaultFractionConfig(),
     geometry: createDefaultGeometryConfig(),
     pattern: createDefaultPatternConfig(),
+    equation: createDefaultEquationConfig(),
     document: {
       header: { title: 'Matteuppgifter', showName: true, showDate: true, instructions: '' },
       fontSizePt: 14,
@@ -124,6 +129,9 @@ const FRACTION_INSTRUCTIONS: Record<FractionDirectionMode, string> = {
  * inte har någon "riktning" som varierar. */
 const PATTERN_INSTRUCTIONS = 'Fyll i de tal som saknas i talföljden.';
 
+/** Instruktionstext för ekvationsblad — se DocumentHeader.instructions. */
+const EQUATION_INSTRUCTIONS = 'Lös ekvationerna. Skriv värdet på x.';
+
 /**
  * Ett vettigt standardvärde för header.instructions, beräknat utifrån
  * bladtyp och (för klocka/bråk) vald riktning, eller (för räknesätt) om
@@ -143,6 +151,8 @@ export function computeDefaultInstructions(state: AppState): string {
       return GEOMETRY_INSTRUCTIONS[state.geometry.measure];
     case 'pattern':
       return PATTERN_INSTRUCTIONS;
+    case 'equation':
+      return EQUATION_INSTRUCTIONS;
   }
 }
 
@@ -193,6 +203,17 @@ function createDefaultPatternConfig(): PatternGeneratorConfig {
     termCount: 6,
     hiddenCount: 2,
     count: 10,
+    avoidDuplicates: true,
+    seed: randomSeed(),
+  };
+}
+
+function createDefaultEquationConfig(): EquationGeneratorConfig {
+  return {
+    operations: { add: true, sub: true, mul: false, div: false },
+    operandRange: { min: 1, max: 20 },
+    allowNegative: false,
+    count: 12,
     avoidDuplicates: true,
     seed: randomSeed(),
   };

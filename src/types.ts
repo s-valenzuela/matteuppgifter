@@ -91,8 +91,8 @@ export interface DocumentConfig {
 }
 
 /** Vilken typ av blad som ska genereras — styr vilken av
- * generator/clock/fraction/geometry/pattern som används. */
-export type SheetType = 'arithmetic' | 'clock' | 'fraction' | 'geometry' | 'pattern';
+ * generator/clock/fraction/geometry/pattern/equation som används. */
+export type SheetType = 'arithmetic' | 'clock' | 'fraction' | 'geometry' | 'pattern' | 'equation';
 
 /**
  * Ett kryssbart minutmärke för klockuppgifter — flera kan vara påslagna
@@ -247,6 +247,41 @@ export interface PatternProblem {
   hiddenIndices: number[];
   /** Skillnaden mellan varje term (negativ för en nedåtgående följd). */
   step: number;
+}
+
+/**
+ * En enkel ekvation med en obekant, t.ex. "x + 5 = 12" eller "12 - x = 4".
+ * Det obekanta talet skrivs alltid som "x" INUTI uttrycket (aldrig ensamt på
+ * högersidan, t.ex. "5 + 7 = x" — det vore bara ett omdöpt vanligt tal, inte
+ * en ekvation att lösa) — se unknownSlot. `a`/`b` är de SANNA värdena;
+ * `result` är op(a, b), talet på ekvationens högersida.
+ */
+export interface EquationProblem {
+  op: Operation;
+  a: number;
+  b: number;
+  result: number;
+  /** Vilken operand som skrivs som "x". Division har alltid 'a' (dividenden)
+   * — se core/equations.ts för samma solvability-resonemang som
+   * chooseMissingSlot i core/generate.ts. */
+  unknownSlot: 'a' | 'b';
+}
+
+export interface EquationGeneratorConfig {
+  /** Vilka räknesätt som får förekomma — minst ett bör vara ikryssat, se
+   * validateEquationConfig. */
+  operations: Record<Operation, boolean>;
+  /** Talområde för de kända talen (och för x:s värde). */
+  operandRange: Range;
+  /** Tillåt att x eller mellanledet blir negativt — annars byts a/b vid
+   * subtraktion, som OperationConfig.noNegative. */
+  allowNegative: boolean;
+  /** Totalt antal uppgifter att generera. */
+  count: number;
+  /** Undvik dubbletter (samma räknesätt, tal och obekant plats) så länge poolen räcker till. */
+  avoidDuplicates: boolean;
+  /** Visas i sidfoten — separat seed, se motsvarande kommentar på ClockGeneratorConfig. */
+  seed: number;
 }
 
 export interface PatternGeneratorConfig {

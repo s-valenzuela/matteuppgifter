@@ -92,6 +92,17 @@ describe('saveState / loadState', () => {
     expect(loaded?.pattern.steps).toEqual(createDefaultState().pattern.steps);
   });
 
+  it('fyller på equation för ett tillstånd sparat innan ekvationsbladet fanns', () => {
+    const legacyState = createDefaultState();
+    // @ts-expect-error simulerar JSON sparat innan equation fanns
+    delete legacyState.equation;
+    localStorage.setItem('matteuppgifter:state:v1', JSON.stringify(legacyState));
+
+    const loaded = loadState();
+    expect(loaded?.equation).toBeDefined();
+    expect(loaded?.equation.operations).toEqual(createDefaultState().equation.operations);
+  });
+
   it('behåller egna document-värden som skiljer sig från standardvärdena', () => {
     const state = createDefaultState();
     state.document.header.title = 'Läxa vecka 7';

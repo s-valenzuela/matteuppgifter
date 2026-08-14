@@ -173,6 +173,13 @@ const ESTIMATED_CHARS_PER_TERM_PATTERN = 4;
 const DEFAULT_PATTERN_TERM_COUNT = 6;
 
 /**
+ * Uppskattat antal tecken i den längsta rimliga ekvationsraden, t.ex.
+ * "100 × x = 1000   x = _______" — se ESTIMATED_CHARS_PER_PROBLEM för samma
+ * princip i räknesättets vågräta läge.
+ */
+const ESTIMATED_CHARS_PER_PROBLEM_EQUATION = 28;
+
+/**
  * Geometrifigurens målstorlek — samma faktor/min/max som klockan och bråket
  * (se ovan) så att alla tre figurbaserade bladtyperna känns lika stora.
  * Rutan rymmer BÅDE figuren och dess måttetiketter; geometryFigure.ts drar in
@@ -210,7 +217,7 @@ export function fractionStackReachAboveMm(fontSizeMm: number): number {
 }
 
 export type DocumentLayoutMode =
-  'grid' | 'vertical' | 'clock' | 'fraction' | 'fractionText' | 'geometry' | 'pattern';
+  'grid' | 'vertical' | 'clock' | 'fraction' | 'fractionText' | 'geometry' | 'pattern' | 'equation';
 
 export interface GridLayoutInput {
   problemCount: number;
@@ -419,7 +426,9 @@ function resolveColumns(
           ? ESTIMATED_CHARS_PER_PROBLEM_FRACTION_TEXT
           : layoutMode === 'pattern'
             ? (termCount ?? DEFAULT_PATTERN_TERM_COUNT) * ESTIMATED_CHARS_PER_TERM_PATTERN
-            : ESTIMATED_CHARS_PER_PROBLEM;
+            : layoutMode === 'equation'
+              ? ESTIMATED_CHARS_PER_PROBLEM_EQUATION
+              : ESTIMATED_CHARS_PER_PROBLEM;
     const estimatedCellWidthMm =
       fontSizeMm * AVG_CHAR_WIDTH_FACTOR * estimatedChars + COLUMN_GUTTER_MM;
     return Math.max(1, Math.floor(availableWidthMm / estimatedCellWidthMm));
