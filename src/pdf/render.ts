@@ -230,18 +230,24 @@ function drawHeader(
   }
 }
 
+/** Webbadressen som skrivs ut (och länkas) i sidfoten, se drawFooter — så att
+ * ett utskrivet eller vidarebefordrat blad alltid går att spåra tillbaka till
+ * generatorn, även utan den delbara länken (som dessutom är seed-specifik
+ * och därför mycket längre än den här). */
+const SITE_URL = 'https://www.matteuppgifter.se';
+
 function drawFooter(doc: jsPDF, page: number, totalPages: number, seed: number): void {
   const { pageWidthMm, pageHeightMm, marginMm } = A4_METRICS;
+  const y = pageHeightMm - marginMm / 2;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text(
-    `Sida ${page + 1} av ${totalPages} · seed ${seed}`,
-    pageWidthMm - marginMm,
-    pageHeightMm - marginMm / 2,
-    {
-      align: 'right',
-    },
-  );
+  doc.text(`Sida ${page + 1} av ${totalPages} · seed ${seed}`, pageWidthMm - marginMm, y, {
+    align: 'right',
+  });
+  // textWithLink (till skillnad från text()) lägger även till en klickbar
+  // länkannotation ovanpå texten — synlig som vanlig text i utskrift, men
+  // klickbar i alla PDF-läsare.
+  doc.textWithLink(SITE_URL.replace('https://', ''), marginMm, y, { url: SITE_URL });
 }
 
 function drawProblem(
