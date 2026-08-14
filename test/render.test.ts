@@ -814,7 +814,6 @@ describe('renderPatternSheetToPdf', () => {
       fontSizePt: docConfig.fontSizePt,
       columns: docConfig.columns,
       layout: 'pattern',
-      termCount: config.termCount,
     });
 
     const doc = renderPatternSheetToPdf(problems, docConfig, patternOptions(config));
@@ -830,7 +829,6 @@ describe('renderPatternSheetToPdf', () => {
       fontSizePt: docConfig.fontSizePt,
       columns: docConfig.columns,
       layout: 'pattern',
-      termCount: config.termCount,
     });
 
     const withoutKey = renderPatternSheetToPdf(problems, docConfig, patternOptions(config));

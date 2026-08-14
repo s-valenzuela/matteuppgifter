@@ -160,19 +160,6 @@ const FRACTION_BLANK_BOX_REACH_ABOVE_MM = 5;
 const ESTIMATED_CHARS_PER_PROBLEM_FRACTION_TEXT = 13;
 
 /**
- * Uppskattat antal tecken PER TERM i en talföljd (upp till tresiffrigt tal +
- * ", "-avskiljare), för 'pattern'-lägets kolumnbredd — se resolveColumns.
- * Till skillnad från klockan/bråket/geometrin beror radens bredd på
- * termCount, ett dokumentnivå-val, inte på teckenstorleken ensam, så
- * uppskattningen görs per term och multipliceras med termCount i
- * resolveColumns.
- */
-const ESTIMATED_CHARS_PER_TERM_PATTERN = 4;
-/** Om termCount saknas i GridLayoutInput (bör inte hända i praktiken, men
- * computeGridLayout ska aldrig krascha på ett ofullständigt anrop). */
-const DEFAULT_PATTERN_TERM_COUNT = 6;
-
-/**
  * Uppskattat antal tecken i den längsta rimliga ekvationsraden, t.ex.
  * "100 × x = 1000   x = _______" — se ESTIMATED_CHARS_PER_PROBLEM för samma
  * princip i räknesättets vågräta läge.
@@ -241,12 +228,6 @@ export interface GridLayoutInput {
   /** Standard 'grid' om utelämnad. */
   layout?: DocumentLayoutMode;
   metrics?: PageMetrics;
-  /** Antal termer per talföljd — bara använt när layout är 'pattern', för att
-   * uppskatta radbredden (se resolveColumns). Till skillnad från klockans/
-   * bråkets/geometrins figurstorlek (som räknas ut ur fontSizePt ensam) beror
-   * en talföljdsrads bredd på ett dokumentnivå-val, så det måste skickas in
-   * separat. */
-  termCount?: number;
 }
 
 export interface CellPosition {
@@ -314,7 +295,6 @@ export function computeGridLayout(input: GridLayoutInput): GridLayout {
     fontSizeMm,
     availableWidthMm,
     targetVisualSizeMm,
-    input.termCount,
   );
   const columnWidthMm = availableWidthMm / columns;
 
@@ -421,8 +401,16 @@ function resolveColumns(
   fontSizeMm: number,
   availableWidthMm: number,
   targetVisualSizeMm: number,
-  termCount: number | undefined,
 ): number {
+  // Mönsterblad tillåter aldrig flera kolumner, oavsett vad `columns` säger
+  // (manuellt valt tal, "auto", eller en delad länk sparad innan den här
+  // spärren fanns) — en rad med många termer (högt termCount) blir annars
+  // för bred för en smal kolumn och krymps ner till en teckenstorlek som är
+  // jobbig att läsa, se computePatternMetrics i render.ts. En enda kolumn
+  // som fyller hela sidbredden ger radet gott om plats i stället.
+  if (layoutMode === 'pattern') {
+    return 1;
+  }
   if (columns === 'auto') {
     if (layoutMode === 'clock' || layoutMode === 'fraction' || layoutMode === 'geometry') {
       const gutterMm =
@@ -439,13 +427,11 @@ function resolveColumns(
         ? ESTIMATED_CHARS_PER_PROBLEM_VERTICAL
         : layoutMode === 'fractionText'
           ? ESTIMATED_CHARS_PER_PROBLEM_FRACTION_TEXT
-          : layoutMode === 'pattern'
-            ? (termCount ?? DEFAULT_PATTERN_TERM_COUNT) * ESTIMATED_CHARS_PER_TERM_PATTERN
-            : layoutMode === 'equation'
-              ? ESTIMATED_CHARS_PER_PROBLEM_EQUATION
-              : layoutMode === 'measurement'
-                ? ESTIMATED_CHARS_PER_PROBLEM_MEASUREMENT
-                : ESTIMATED_CHARS_PER_PROBLEM;
+          : layoutMode === 'equation'
+            ? ESTIMATED_CHARS_PER_PROBLEM_EQUATION
+            : layoutMode === 'measurement'
+              ? ESTIMATED_CHARS_PER_PROBLEM_MEASUREMENT
+              : ESTIMATED_CHARS_PER_PROBLEM;
     const estimatedCellWidthMm =
       fontSizeMm * AVG_CHAR_WIDTH_FACTOR * estimatedChars + COLUMN_GUTTER_MM;
     return Math.max(1, Math.floor(availableWidthMm / estimatedCellWidthMm));

@@ -108,6 +108,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
 
   const operationsSection = q<HTMLElement>(container, '#operations-section');
   const layoutField = q<HTMLElement>(container, '#layout-field');
+  const columnsField = q<HTMLElement>(container, '#columns-field');
   const missingNumberField = q<HTMLElement>(container, '#missingNumber-field');
   const shuffleField = q<HTMLElement>(container, '#shuffle-field');
   const clockSection = q<HTMLElement>(container, '#clock-section');
@@ -254,6 +255,10 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     }
     operationsSection.hidden = !isArithmetic();
     layoutField.hidden = !isArithmetic();
+    // Mönsterblad tvingar alltid en enda kolumn (se resolveColumns i
+    // pdf/layout.ts) — kolumnväljaren döljs så att den inte antyder ett val
+    // som ändå ignoreras.
+    columnsField.hidden = isPattern();
     missingNumberField.hidden = !isArithmetic();
     shuffleField.hidden = !isArithmetic();
     clockSection.hidden = !isClock();
@@ -998,7 +1003,7 @@ function renderTemplate(): string {
       <h2 id="sheet-heading">Blad</h2>
       <div class="field-grid">
         <label>Antal uppgifter <input type="number" id="count" min="1" step="1" /></label>
-        <label>Kolumner
+        <label id="columns-field">Kolumner
           <select id="columns">
             <option value="auto">Auto</option>
             <option value="1">1</option>
