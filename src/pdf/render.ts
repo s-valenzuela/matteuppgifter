@@ -1516,7 +1516,6 @@ export function renderPatternSheetToPdf(
     fontSizePt: config.fontSizePt,
     columns: config.columns,
     layout: 'pattern',
-    termCount: patternOptions.termCount,
     metrics: layoutMetricsFor(config, problems.length),
   });
 
