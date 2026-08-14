@@ -101,6 +101,15 @@ h1 {
   line-height: 1.55;
 }
 
+.about a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.about a:hover {
+  color: var(--text);
+}
+
 .subtitle {
   margin: 0 0 1.25rem;
   color: var(--text-muted);
