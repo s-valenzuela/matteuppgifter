@@ -103,6 +103,17 @@ describe('saveState / loadState', () => {
     expect(loaded?.equation.operations).toEqual(createDefaultState().equation.operations);
   });
 
+  it('fyller på measurement för ett tillstånd sparat innan enhetsbytesbladet fanns', () => {
+    const legacyState = createDefaultState();
+    // @ts-expect-error simulerar JSON sparat innan measurement fanns
+    delete legacyState.measurement;
+    localStorage.setItem('matteuppgifter:state:v1', JSON.stringify(legacyState));
+
+    const loaded = loadState();
+    expect(loaded?.measurement).toBeDefined();
+    expect(loaded?.measurement.quantity).toBe(createDefaultState().measurement.quantity);
+  });
+
   it('behåller egna document-värden som skiljer sig från standardvärdena', () => {
     const state = createDefaultState();
     state.document.header.title = 'Läxa vecka 7';

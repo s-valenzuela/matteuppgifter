@@ -4,6 +4,7 @@ import { FRACTION_DENOMINATORS, generateFractionProblems } from '../src/core/fra
 import { generateProblems } from '../src/core/generate';
 import { generateEquationProblems } from '../src/core/equations';
 import { generateGeometryProblems } from '../src/core/geometry';
+import { generateMeasurementProblems } from '../src/core/measurement';
 import { generatePatternProblems } from '../src/core/patterns';
 import { A4_METRICS, computeGridLayout, computeHeaderHeightMm } from '../src/pdf/layout';
 import {
@@ -11,6 +12,7 @@ import {
   renderEquationSheetToPdf,
   renderFractionSheetToPdf,
   renderGeometrySheetToPdf,
+  renderMeasurementSheetToPdf,
   renderPatternSheetToPdf,
   renderProblemsToPdf,
   type ClockDocumentOptions,
@@ -24,6 +26,7 @@ import type {
   EquationGeneratorConfig,
   FractionGeneratorConfig,
   GeometryGeneratorConfig,
+  MeasurementGeneratorConfig,
   PatternGeneratorConfig,
 } from '../src/types';
 import { baseConfig, opConfig } from './helpers';
@@ -996,6 +999,113 @@ describe('renderEquationSheetToPdf', () => {
       },
     });
     const doc = renderEquationSheetToPdf(problems, config);
+    expect(doc.getNumberOfPages()).toBe(2);
+    expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+  });
+});
+
+describe('renderMeasurementSheetToPdf', () => {
+  function baseMeasurementConfig(
+    overrides: Partial<MeasurementGeneratorConfig> = {},
+  ): MeasurementGeneratorConfig {
+    return {
+      quantity: 'mixed',
+      valueRange: { min: 1, max: 200 },
+      count: 9,
+      avoidDuplicates: true,
+      seed: 1,
+      ...overrides,
+    };
+  }
+
+  it('genererar en icke-tom PDF för ett litet enhetsbytesblad', () => {
+    const problems = generateMeasurementProblems(baseMeasurementConfig());
+    const doc = renderMeasurementSheetToPdf(problems, baseDocumentConfig());
+    expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+    expect(doc.getNumberOfPages()).toBe(1);
+  });
+
+  it('lämnar en enda tom sida med bara rubriken när inga uppgifter finns', () => {
+    const doc = renderMeasurementSheetToPdf([], baseDocumentConfig());
+    expect(doc.getNumberOfPages()).toBe(1);
+  });
+
+  it('matchar sidantalet från layout-beräkningen för enhetsbytesläget', () => {
+    const problems = generateMeasurementProblems(
+      baseMeasurementConfig({ count: 60, avoidDuplicates: false }),
+    );
+    const config = baseDocumentConfig({ columns: 3, fontSizePt: 14 });
+    const layout = computeGridLayout({
+      problemCount: problems.length,
+      fontSizePt: config.fontSizePt,
+      columns: config.columns,
+      layout: 'measurement',
+    });
+
+    const doc = renderMeasurementSheetToPdf(problems, config);
+    expect(doc.getNumberOfPages()).toBe(layout.pageCount);
+  });
+
+  it('lägger till facit-sidor sist när includeAnswerKey är satt', () => {
+    const problems = generateMeasurementProblems(
+      baseMeasurementConfig({ count: 60, avoidDuplicates: false }),
+    );
+    const config = baseDocumentConfig({ columns: 3, fontSizePt: 14 });
+    const layout = computeGridLayout({
+      problemCount: problems.length,
+      fontSizePt: config.fontSizePt,
+      columns: config.columns,
+      layout: 'measurement',
+    });
+
+    const withoutKey = renderMeasurementSheetToPdf(problems, config);
+    const withKey = renderMeasurementSheetToPdf(problems, { ...config, includeAnswerKey: true });
+
+    expect(withoutKey.getNumberOfPages()).toBe(layout.pageCount);
+    expect(withKey.getNumberOfPages()).toBe(layout.pageCount * 2);
+  });
+
+  it('fungerar för alla storheter och svarsstilar, med facit, utan att kasta fel', () => {
+    for (const quantity of ['length', 'mass', 'volume', 'time', 'mixed'] as const) {
+      for (const answerStyle of ['blank', 'line', 'box'] as const) {
+        const problems = generateMeasurementProblems(
+          baseMeasurementConfig({ quantity, count: 12 }),
+        );
+        const doc = renderMeasurementSheetToPdf(
+          problems,
+          baseDocumentConfig({ answerStyle, includeAnswerKey: true }),
+        );
+        expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('fungerar för smala kolumner och extrema teckenstorlekar utan att kasta fel', () => {
+    const problems = generateMeasurementProblems(baseMeasurementConfig({ count: 12 }));
+    for (const columns of [1, 2, 4, 6] as const) {
+      for (const fontSizePt of [10, 14, 24, 32]) {
+        const doc = renderMeasurementSheetToPdf(
+          problems,
+          baseDocumentConfig({ columns, fontSizePt }),
+        );
+        expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('respekterar instruktionsrad och löst exempel, precis som de andra bladtyperna', () => {
+    const problems = generateMeasurementProblems(baseMeasurementConfig({ count: 9 }));
+    const config = baseDocumentConfig({
+      exampleFirst: true,
+      includeAnswerKey: true,
+      header: {
+        title: 'Matteuppgifter',
+        showName: true,
+        showDate: true,
+        instructions: 'Räkna om till rätt enhet.',
+      },
+    });
+    const doc = renderMeasurementSheetToPdf(problems, config);
     expect(doc.getNumberOfPages()).toBe(2);
     expect(doc.output('arraybuffer').byteLength).toBeGreaterThan(0);
   });

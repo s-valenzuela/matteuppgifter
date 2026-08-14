@@ -437,6 +437,37 @@ describe('computeGridLayout', () => {
     });
   });
 
+  describe('enhetsbytesläge (layout: "measurement")', () => {
+    it('placerar aldrig innehåll utanför marginalerna', () => {
+      for (const columns of ['auto', 1, 2, 4, 6] as const) {
+        for (const fontSizePt of [10, 14, 24]) {
+          const layout = computeGridLayout({
+            problemCount: 41,
+            fontSizePt,
+            columns,
+            layout: 'measurement',
+          });
+          for (const p of layout.positions) {
+            expect(p.xMm).toBeGreaterThanOrEqual(A4_METRICS.marginMm);
+            expect(p.xMm + layout.columnWidthMm).toBeLessThanOrEqual(
+              A4_METRICS.pageWidthMm - A4_METRICS.marginMm + 1e-9,
+            );
+          }
+        }
+      }
+    });
+
+    it('fördelar uppgifter över rätt antal sidor', () => {
+      const layout = computeGridLayout({
+        problemCount: 30,
+        fontSizePt: 14,
+        columns: 3,
+        layout: 'measurement',
+      });
+      expect(layout.pageCount).toBe(Math.ceil(30 / layout.problemsPerPage));
+    });
+  });
+
   describe('computeHeaderHeightMm', () => {
     it('ger tillbaka bashöjden oförändrad utan extra rader', () => {
       expect(computeHeaderHeightMm(A4_METRICS.headerHeightMm, 0)).toBe(A4_METRICS.headerHeightMm);

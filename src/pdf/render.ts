@@ -10,6 +10,7 @@ import type {
   FractionProblem,
   GeometryGeneratorConfig,
   GeometryProblem,
+  MeasurementProblem,
   PatternGeneratorConfig,
   PatternProblem,
   Problem,
@@ -1730,6 +1731,124 @@ function drawEquationProblem(
     centerX,
     baselineY: position.yMm,
     prompt: `${leftSide} = ${problem.result}   x = `,
+    answerStyle: config.answerStyle,
+    maxWidthMm,
+    basePt: config.fontSizePt,
+  });
+}
+
+/** Luft mellan kolumnkanten och en centrerad textrad — samma marginal som
+ * geometrins/ekvationens svarsrad använder, delad här av samma skäl. */
+const MEASUREMENT_LABEL_MAX_WIDTH_MARGIN_MM = GEOMETRY_LABEL_MAX_WIDTH_MARGIN_MM;
+
+/**
+ * Enhetsbytesblad delar sidhuvud/sidfot och sidbrytningslogik med de andra
+ * renderXToPdf-funktionerna, men har ett eget uppgiftsformat: en centrerad
+ * rad "3,5 m = ____ cm", se drawMeasurementProblem. Precis som
+ * EquationGeneratorConfig behövs ingen del av MeasurementGeneratorConfig
+ * kvar vid ritningen (bara vid genereringen), så det finns ingen
+ * MeasurementDocumentOptions-typ.
+ */
+export function renderMeasurementSheetToPdf(
+  problems: MeasurementProblem[],
+  config: DocumentConfig,
+): jsPDF {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const layout = computeGridLayout({
+    problemCount: problems.length,
+    fontSizePt: config.fontSizePt,
+    columns: config.columns,
+    layout: 'measurement',
+    metrics: layoutMetricsFor(config, problems.length),
+  });
+
+  if (layout.pageCount === 0) {
+    drawHeader(doc, config, null, false);
+    drawFooter(doc, 0, 1, config.seed);
+    return doc;
+  }
+
+  renderMeasurementSection(doc, problems, layout, config, {
+    showAnswers: false,
+    sectionLabel: null,
+  });
+
+  if (config.includeAnswerKey) {
+    doc.addPage();
+    renderMeasurementSection(doc, problems, layout, config, {
+      showAnswers: true,
+      sectionLabel: 'Facit',
+    });
+  }
+
+  return doc;
+}
+
+function renderMeasurementSection(
+  doc: jsPDF,
+  problems: MeasurementProblem[],
+  layout: GridLayout,
+  config: DocumentConfig,
+  options: SectionOptions,
+): void {
+  for (let page = 0; page < layout.pageCount; page++) {
+    if (page > 0) {
+      doc.addPage();
+    }
+    const showExampleNote = !options.showAnswers && config.exampleFirst && page === 0;
+    drawHeader(doc, config, options.sectionLabel, showExampleNote);
+    for (const position of layout.positions) {
+      if (position.page === page) {
+        const showAnswers = options.showAnswers || (config.exampleFirst && position.index === 0);
+        drawMeasurementProblem(
+          doc,
+          problems[position.index],
+          position,
+          layout,
+          config,
+          showAnswers,
+        );
+      }
+    }
+    drawFooter(doc, page, layout.pageCount, config.seed);
+  }
+}
+
+/**
+ * "3,5 m = ____ cm" (eller med svaret ifyllt i facit) — centrerad som en
+ * helhet i kolumnen, precis som ekvationens "x + 5 = 12   x = ____". Facit
+ * skriver ut hela raden med svaret inifogat, samma teknik som
+ * drawEquationProblem.
+ */
+function drawMeasurementProblem(
+  doc: jsPDF,
+  problem: MeasurementProblem,
+  position: CellPosition,
+  layout: GridLayout,
+  config: DocumentConfig,
+  showAnswers: boolean,
+): void {
+  const centerX = position.xMm + layout.columnWidthMm / 2;
+  const maxWidthMm = layout.columnWidthMm - MEASUREMENT_LABEL_MAX_WIDTH_MARGIN_MM;
+  const prompt = `${problem.fromValue} ${problem.fromUnit} = `;
+
+  if (showAnswers) {
+    drawFittedCenteredClockLabel(
+      doc,
+      `${prompt}${problem.answerText} ${problem.toUnit}`,
+      centerX,
+      position.yMm,
+      maxWidthMm,
+      config.fontSizePt,
+    );
+    return;
+  }
+
+  drawCenteredPromptWithBlank(doc, {
+    centerX,
+    baselineY: position.yMm,
+    prompt,
+    suffix: ` ${problem.toUnit}`,
     answerStyle: config.answerStyle,
     maxWidthMm,
     basePt: config.fontSizePt,

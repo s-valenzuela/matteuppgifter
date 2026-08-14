@@ -9,6 +9,7 @@ import type {
   GeneratorConfig,
   GeometryGeneratorConfig,
   GeometryMeasureMode,
+  MeasurementGeneratorConfig,
   OperationConfig,
   PatternGeneratorConfig,
   SheetType,
@@ -34,6 +35,7 @@ export interface AppState {
   geometry: GeometryGeneratorConfig;
   pattern: PatternGeneratorConfig;
   equation: EquationGeneratorConfig;
+  measurement: MeasurementGeneratorConfig;
   document: Omit<DocumentConfig, 'seed'>;
 }
 
@@ -49,7 +51,9 @@ export function toDocumentConfig(state: AppState): DocumentConfig {
             ? state.pattern.seed
             : state.sheetType === 'equation'
               ? state.equation.seed
-              : state.generator.seed;
+              : state.sheetType === 'measurement'
+                ? state.measurement.seed
+                : state.generator.seed;
   return { ...state.document, seed };
 }
 
@@ -82,6 +86,7 @@ export function createDefaultState(): AppState {
     geometry: createDefaultGeometryConfig(),
     pattern: createDefaultPatternConfig(),
     equation: createDefaultEquationConfig(),
+    measurement: createDefaultMeasurementConfig(),
     document: {
       header: { title: 'Matteuppgifter', showName: true, showDate: true, instructions: '' },
       fontSizePt: 14,
@@ -132,6 +137,9 @@ const PATTERN_INSTRUCTIONS = 'Fyll i de tal som saknas i talföljden.';
 /** Instruktionstext för ekvationsblad — se DocumentHeader.instructions. */
 const EQUATION_INSTRUCTIONS = 'Lös ekvationerna. Skriv värdet på x.';
 
+/** Instruktionstext för enhetsbytesblad — se DocumentHeader.instructions. */
+const MEASUREMENT_INSTRUCTIONS = 'Räkna om till rätt enhet.';
+
 /**
  * Ett vettigt standardvärde för header.instructions, beräknat utifrån
  * bladtyp och (för klocka/bråk) vald riktning, eller (för räknesätt) om
@@ -153,6 +161,8 @@ export function computeDefaultInstructions(state: AppState): string {
       return PATTERN_INSTRUCTIONS;
     case 'equation':
       return EQUATION_INSTRUCTIONS;
+    case 'measurement':
+      return MEASUREMENT_INSTRUCTIONS;
   }
 }
 
@@ -214,6 +224,16 @@ function createDefaultEquationConfig(): EquationGeneratorConfig {
     operandRange: { min: 1, max: 20 },
     allowNegative: false,
     count: 12,
+    avoidDuplicates: true,
+    seed: randomSeed(),
+  };
+}
+
+function createDefaultMeasurementConfig(): MeasurementGeneratorConfig {
+  return {
+    quantity: 'length',
+    valueRange: { min: 1, max: 200 },
+    count: 10,
     avoidDuplicates: true,
     seed: randomSeed(),
   };

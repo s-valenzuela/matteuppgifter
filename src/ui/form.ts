@@ -8,6 +8,7 @@ import type {
   FractionShapeMode,
   GeometryMeasureMode,
   GeometryShapeMode,
+  MeasurementQuantityMode,
   Operation,
   SheetType,
 } from '../types';
@@ -71,6 +72,14 @@ const GEOMETRY_MEASURE_LABELS: Record<GeometryMeasureMode, string> = {
  * PatternGeneratorConfig.steps är fria positiva heltal, se types.ts. */
 const PATTERN_STEP_OPTIONS: readonly number[] = [1, 2, 3, 5, 10];
 
+const MEASUREMENT_QUANTITY_LABELS: Record<MeasurementQuantityMode, string> = {
+  length: 'Längd (mm/cm/dm/m/km)',
+  mass: 'Massa (g/hg/kg)',
+  volume: 'Volym (ml/cl/dl/l)',
+  time: 'Tid (s/min/h)',
+  mixed: 'Blandat',
+};
+
 // Feather-ikon (MIT), inbäddad som inline-SVG istället för en extern ikonfil
 // eftersom appen inte har några andra tillgångar att ladda in.
 const EDIT_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" aria-hidden="true" focusable="false"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>`;
@@ -106,6 +115,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const geometrySection = q<HTMLElement>(container, '#geometry-section');
   const patternSection = q<HTMLElement>(container, '#pattern-section');
   const equationSection = q<HTMLElement>(container, '#equation-section');
+  const measurementSection = q<HTMLElement>(container, '#measurement-section');
 
   const operationEls = new Map(
     OPERATION_KEYS.map((key) => [
@@ -165,6 +175,10 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const equationMaxEl = q<HTMLInputElement>(container, '#equation-max');
   const equationAllowNegativeEl = q<HTMLInputElement>(container, '#equation-allowNegative');
 
+  const measurementQuantityEl = q<HTMLSelectElement>(container, '#measurement-quantity');
+  const measurementMinEl = q<HTMLInputElement>(container, '#measurement-min');
+  const measurementMaxEl = q<HTMLInputElement>(container, '#measurement-max');
+
   const countEl = q<HTMLInputElement>(container, '#count');
   const avoidDuplicatesEl = q<HTMLInputElement>(container, '#avoidDuplicates');
   const shuffleEl = q<HTMLInputElement>(container, '#shuffle');
@@ -211,6 +225,10 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     return state.sheetType === 'equation';
   }
 
+  function isMeasurement(): boolean {
+    return state.sheetType === 'measurement';
+  }
+
   function isArithmetic(): boolean {
     return state.sheetType === 'arithmetic';
   }
@@ -226,6 +244,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     if (isGeometry()) return state.geometry;
     if (isPattern()) return state.pattern;
     if (isEquation()) return state.equation;
+    if (isMeasurement()) return state.measurement;
     return state.generator;
   }
 
@@ -242,6 +261,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     geometrySection.hidden = !isGeometry();
     patternSection.hidden = !isPattern();
     equationSection.hidden = !isEquation();
+    measurementSection.hidden = !isMeasurement();
 
     for (const key of OPERATION_KEYS) {
       const cfg = state.generator.operations[key];
@@ -298,6 +318,10 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     equationMinEl.value = String(state.equation.operandRange.min);
     equationMaxEl.value = String(state.equation.operandRange.max);
     equationAllowNegativeEl.checked = state.equation.allowNegative;
+
+    measurementQuantityEl.value = state.measurement.quantity;
+    measurementMinEl.value = String(state.measurement.valueRange.min);
+    measurementMaxEl.value = String(state.measurement.valueRange.max);
 
     const countable = activeCountable();
     countEl.value = String(countable.count);
@@ -363,6 +387,11 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
           // inte får plats i bråkens/räknesättens lilla ruta. Samma
           // "sätts bara vid en faktisk växling"-princip som ovan.
           if (state.sheetType === 'equation' && previousType !== 'equation') {
+            state.document.answerStyle = 'line';
+          }
+          // Enhetsbytessvar kan vara flersiffriga decimaler ("~1,7"), samma
+          // "sätts bara vid en faktisk växling"-princip som ovan.
+          if (state.sheetType === 'measurement' && previousType !== 'measurement') {
             state.document.answerStyle = 'line';
           }
         });
@@ -599,6 +628,25 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     emitChange();
   });
 
+  measurementQuantityEl.addEventListener('change', () => {
+    state.measurement.quantity = measurementQuantityEl.value as MeasurementQuantityMode;
+    emitChange();
+  });
+  measurementMinEl.addEventListener('input', () => {
+    const value = Number(measurementMinEl.value);
+    if (Number.isFinite(value)) {
+      state.measurement.valueRange.min = value;
+      emitChange();
+    }
+  });
+  measurementMaxEl.addEventListener('input', () => {
+    const value = Number(measurementMaxEl.value);
+    if (Number.isFinite(value)) {
+      state.measurement.valueRange.max = value;
+      emitChange();
+    }
+  });
+
   // "Antal uppgifter"/"Undvik dubbletter" är samma synliga fält för alla tre
   // bladtyper (se activeCountable ovan).
   countEl.addEventListener('input', () => {
@@ -718,6 +766,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
       state.geometry.seed = seed;
       state.pattern.seed = seed;
       state.equation.seed = seed;
+      state.measurement.seed = seed;
       refreshFromState();
       emitChange();
     },
@@ -804,6 +853,12 @@ function renderTemplate(): string {
       `<label><input type="checkbox" id="equation-op-${key}" /> ${OPERATION_LABELS[key]}</label>`,
   ).join('');
 
+  const measurementQuantityOptions = (
+    Object.entries(MEASUREMENT_QUANTITY_LABELS) as [MeasurementQuantityMode, string][]
+  )
+    .map(([value, label]) => `<option value="${value}">${label}</option>`)
+    .join('');
+
   return `
     <section aria-labelledby="sheettype-heading">
       <h2 id="sheettype-heading">Typ av blad</h2>
@@ -814,6 +869,7 @@ function renderTemplate(): string {
         <label><input type="radio" name="sheetType" value="geometry" /> Geometri</label>
         <label><input type="radio" name="sheetType" value="pattern" /> Talmönster</label>
         <label><input type="radio" name="sheetType" value="equation" /> Ekvationer</label>
+        <label><input type="radio" name="sheetType" value="measurement" /> Mätning</label>
       </div>
     </section>
 
@@ -923,6 +979,19 @@ function renderTemplate(): string {
         <label>Till <input type="number" id="equation-max" min="1" step="1" /></label>
       </div>
       <label><input type="checkbox" id="equation-allowNegative" /> Tillåt negativa tal</label>
+    </section>
+
+    <section aria-labelledby="measurement-heading" id="measurement-section">
+      <h2 id="measurement-heading">Mätning</h2>
+      <div class="field-grid">
+        <label>Storhet
+          <select id="measurement-quantity">${measurementQuantityOptions}</select>
+        </label>
+      </div>
+      <div class="op-range">
+        <label>Tal från <input type="number" id="measurement-min" min="1" step="1" /></label>
+        <label>Till <input type="number" id="measurement-max" min="1" step="1" /></label>
+      </div>
     </section>
 
     <section aria-labelledby="sheet-heading">
