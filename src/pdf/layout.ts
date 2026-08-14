@@ -180,6 +180,13 @@ const DEFAULT_PATTERN_TERM_COUNT = 6;
 const ESTIMATED_CHARS_PER_PROBLEM_EQUATION = 28;
 
 /**
+ * Uppskattat antal tecken i den längsta rimliga enhetsbytesraden, t.ex.
+ * "1234 dm = _______ km" — se ESTIMATED_CHARS_PER_PROBLEM för samma princip
+ * i räknesättets vågräta läge.
+ */
+const ESTIMATED_CHARS_PER_PROBLEM_MEASUREMENT = 22;
+
+/**
  * Geometrifigurens målstorlek — samma faktor/min/max som klockan och bråket
  * (se ovan) så att alla tre figurbaserade bladtyperna känns lika stora.
  * Rutan rymmer BÅDE figuren och dess måttetiketter; geometryFigure.ts drar in
@@ -217,7 +224,15 @@ export function fractionStackReachAboveMm(fontSizeMm: number): number {
 }
 
 export type DocumentLayoutMode =
-  'grid' | 'vertical' | 'clock' | 'fraction' | 'fractionText' | 'geometry' | 'pattern' | 'equation';
+  | 'grid'
+  | 'vertical'
+  | 'clock'
+  | 'fraction'
+  | 'fractionText'
+  | 'geometry'
+  | 'pattern'
+  | 'equation'
+  | 'measurement';
 
 export interface GridLayoutInput {
   problemCount: number;
@@ -428,7 +443,9 @@ function resolveColumns(
             ? (termCount ?? DEFAULT_PATTERN_TERM_COUNT) * ESTIMATED_CHARS_PER_TERM_PATTERN
             : layoutMode === 'equation'
               ? ESTIMATED_CHARS_PER_PROBLEM_EQUATION
-              : ESTIMATED_CHARS_PER_PROBLEM;
+              : layoutMode === 'measurement'
+                ? ESTIMATED_CHARS_PER_PROBLEM_MEASUREMENT
+                : ESTIMATED_CHARS_PER_PROBLEM;
     const estimatedCellWidthMm =
       fontSizeMm * AVG_CHAR_WIDTH_FACTOR * estimatedChars + COLUMN_GUTTER_MM;
     return Math.max(1, Math.floor(availableWidthMm / estimatedCellWidthMm));

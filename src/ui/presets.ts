@@ -207,6 +207,32 @@ export const PRESETS: Preset[] = [
       return state;
     },
   },
+  {
+    id: 'measurement-length',
+    label: 'Enhetsbyten längd',
+    build: () => {
+      const state = createDefaultState();
+      state.sheetType = 'measurement';
+      state.measurement.quantity = 'length';
+      state.document.answerStyle = 'line';
+      state.document.header.title = 'Enhetsbyten — längd';
+      state.document.header.instructions = computeDefaultInstructions(state);
+      return state;
+    },
+  },
+  {
+    id: 'measurement-mixed',
+    label: 'Enhetsbyten blandat',
+    build: () => {
+      const state = createDefaultState();
+      state.sheetType = 'measurement';
+      state.measurement.quantity = 'mixed';
+      state.document.answerStyle = 'line';
+      state.document.header.title = 'Enhetsbyten — blandat';
+      state.document.header.instructions = computeDefaultInstructions(state);
+      return state;
+    },
+  },
 ];
 
 /** Nivå-chips: sätter samma talområde på alla fyra räknesätt, oavsett om de är aktiverade. */

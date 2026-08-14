@@ -5,6 +5,7 @@ import { generateEquationProblems } from './core/equations';
 import { generateFractionProblems } from './core/fractions';
 import { generateProblems } from './core/generate';
 import { generateGeometryProblems } from './core/geometry';
+import { generateMeasurementProblems } from './core/measurement';
 import { generatePatternProblems } from './core/patterns';
 import {
   validateClockConfig,
@@ -12,6 +13,7 @@ import {
   validateEquationConfig,
   validateFractionConfig,
   validateGeometryConfig,
+  validateMeasurementConfig,
   validatePatternConfig,
 } from './core/validate';
 import type * as RenderModule from './pdf/render';
@@ -149,6 +151,18 @@ async function regenerate(state: AppState): Promise<void> {
     return;
   }
 
+  if (state.sheetType === 'measurement') {
+    const { config, warnings } = validateMeasurementConfig(state.measurement);
+    renderWarnings(warnings);
+    preview.update(() =>
+      render.renderMeasurementSheetToPdf(
+        generateMeasurementProblems(config),
+        toDocumentConfig(state),
+      ),
+    );
+    return;
+  }
+
   const { config, warnings } = validateConfig(state.generator);
   renderWarnings(warnings);
   preview.update(() =>
@@ -208,6 +222,13 @@ async function buildCurrentPdf(): Promise<jsPDF> {
     const { config } = validateEquationConfig(state.equation);
     return render.renderEquationSheetToPdf(
       generateEquationProblems(config),
+      toDocumentConfig(state),
+    );
+  }
+  if (state.sheetType === 'measurement') {
+    const { config } = validateMeasurementConfig(state.measurement);
+    return render.renderMeasurementSheetToPdf(
+      generateMeasurementProblems(config),
       toDocumentConfig(state),
     );
   }

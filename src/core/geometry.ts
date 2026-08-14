@@ -7,6 +7,7 @@ import type {
   GeometryShapeMode,
   Range,
 } from '../types';
+import { formatDecimal1 } from './numberFormat';
 import { mulberry32, pick, randomInt, type Rng } from './rng';
 
 /** Tak på omdragningsförsök innan generatorn ger upp och accepterar kandidaten den har. */
@@ -212,22 +213,10 @@ export function geometryAnswer(problem: GeometryProblem): number {
   }
 }
 
-/** Hur nära ett avrundat värde måste ligga det exakta för att räknas som
- * exakt. 3,14 × 9 blir 28.259999999999998 i flyttal, så en rak !== -jämförelse
- * skulle stämpla även exakta svar som avrundade. */
-const EXACTNESS_EPSILON = 1e-9;
-
-/**
- * T.ex. "24" (heltal), "28,3" (avrundat, med ~ eftersom avrundningen tappar
- * information) eller "314" (cirkel som råkar gå jämnt ut). Decimalkomma, inte
- * punkt — bladen är på svenska. "~" i stället för "≈" av samma skäl som i
- * formatFractionPercent: ≈ saknas i jsPDF:s WinAnsi-kodning.
- */
+/** T.ex. "24" (heltal) eller "28,3" (avrundat, med ~ eftersom avrundningen
+ * tappar information) — se formatDecimal1 för den delade implementationen. */
 export function formatGeometryValue(value: number): string {
-  const rounded = Math.round(value * 10) / 10;
-  const isExact = Math.abs(rounded - value) < EXACTNESS_EPSILON;
-  const text = Number.isInteger(rounded) ? String(rounded) : String(rounded).replace('.', ',');
-  return isExact ? text : `~${text}`;
+  return formatDecimal1(value);
 }
 
 /** Enheten svaret ska ha: cm för omkrets (en längd), cm² för area (en yta). */

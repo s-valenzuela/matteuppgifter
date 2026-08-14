@@ -2,6 +2,7 @@ import { clockPoolSize } from './clock';
 import { equationPoolSize } from './equations';
 import { fractionPoolSize, FRACTION_DENOMINATORS } from './fractions';
 import { geometryPoolSize } from './geometry';
+import { measurementPoolSize } from './measurement';
 import { patternPoolSize } from './patterns';
 import type {
   ClockGeneratorConfig,
@@ -10,6 +11,7 @@ import type {
   FractionGeneratorConfig,
   GeneratorConfig,
   GeometryGeneratorConfig,
+  MeasurementGeneratorConfig,
   Operation,
   OperationConfig,
   PatternGeneratorConfig,
@@ -43,6 +45,11 @@ export interface PatternValidationResult {
 
 export interface EquationValidationResult {
   config: EquationGeneratorConfig;
+  warnings: string[];
+}
+
+export interface MeasurementValidationResult {
+  config: MeasurementGeneratorConfig;
   warnings: string[];
 }
 
@@ -272,6 +279,40 @@ export function validateEquationConfig(input: EquationGeneratorConfig): Equation
     if (poolSize < count) {
       warnings.push(
         `De valda inställningarna rymmer bara ca ${poolSize} unika ekvationer, men ${count} ` +
+          'efterfrågas — uppgifter kommer att upprepas.',
+      );
+    }
+  }
+
+  return { config, warnings };
+}
+
+/** Motsvarigheten till validateGeometryConfig för enhetsbytesblad — se
+ * kommentaren där. valueRange klampas till ≥ 1 (inte ≥ 0) av samma skäl som
+ * geometrins sideRange: en given siffra på 0 är inte en meningsfull
+ * mätning. */
+export function validateMeasurementConfig(
+  input: MeasurementGeneratorConfig,
+): MeasurementValidationResult {
+  const warnings: string[] = [];
+  const count = normalizeCount(input.count);
+  if (count !== input.count) {
+    warnings.push('Antalet uppgifter justerades till ett positivt heltal.');
+  }
+
+  const normalized = normalizeRange(input.valueRange);
+  const valueRange: Range = { min: Math.max(1, normalized.min), max: Math.max(1, normalized.max) };
+  if (valueRange.min !== input.valueRange.min || valueRange.max !== input.valueRange.max) {
+    warnings.push('Talområdet justerades till positiva heltal (minst 1).');
+  }
+
+  const config: MeasurementGeneratorConfig = { ...input, valueRange, count };
+
+  if (input.avoidDuplicates && count > 0) {
+    const poolSize = measurementPoolSize(config);
+    if (poolSize < count) {
+      warnings.push(
+        `De valda inställningarna rymmer bara ca ${poolSize} unika uppgifter, men ${count} ` +
           'efterfrågas — uppgifter kommer att upprepas.',
       );
     }

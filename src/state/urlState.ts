@@ -8,6 +8,7 @@ import type {
   FractionShapeMode,
   GeometryMeasureMode,
   GeometryShapeMode,
+  MeasurementQuantityMode,
   Operation,
   OperationConfig,
   Range,
@@ -25,6 +26,7 @@ const SHEET_TYPES: readonly SheetType[] = [
   'geometry',
   'pattern',
   'equation',
+  'measurement',
 ];
 const CLOCK_STEPS: readonly ClockStep[] = ['hour', 'half', 'quarter', 'five'];
 const CLOCK_DIRECTIONS: readonly ClockDirectionMode[] = [
@@ -42,6 +44,13 @@ const FRACTION_DIRECTIONS: readonly FractionDirectionMode[] = [
   'shade',
   'identifyPercent',
   'toPercent',
+  'mixed',
+];
+const MEASUREMENT_QUANTITIES: readonly MeasurementQuantityMode[] = [
+  'length',
+  'mass',
+  'volume',
+  'time',
   'mixed',
 ];
 
@@ -133,6 +142,13 @@ export function encodeState(state: AppState): URLSearchParams {
   params.set('en', String(state.equation.count));
   params.set('edup', boolStr(state.equation.avoidDuplicates));
   params.set('eseed', String(state.equation.seed));
+
+  params.set('mq', state.measurement.quantity);
+  params.set('mmin', String(state.measurement.valueRange.min));
+  params.set('mmax', String(state.measurement.valueRange.max));
+  params.set('mn', String(state.measurement.count));
+  params.set('mdup', boolStr(state.measurement.avoidDuplicates));
+  params.set('mseed', String(state.measurement.seed));
 
   return params;
 }
@@ -237,6 +253,21 @@ export function decodeState(search: string): AppState | null {
   state.equation.avoidDuplicates = boolOr(params.get('edup'), fallback.equation.avoidDuplicates);
   state.equation.seed = intOr(params.get('eseed'), fallback.equation.seed);
 
+  state.measurement.quantity = decodeMeasurementQuantity(
+    params.get('mq'),
+    fallback.measurement.quantity,
+  );
+  state.measurement.valueRange = {
+    min: intOr(params.get('mmin'), fallback.measurement.valueRange.min),
+    max: intOr(params.get('mmax'), fallback.measurement.valueRange.max),
+  };
+  state.measurement.count = intOr(params.get('mn'), fallback.measurement.count);
+  state.measurement.avoidDuplicates = boolOr(
+    params.get('mdup'),
+    fallback.measurement.avoidDuplicates,
+  );
+  state.measurement.seed = intOr(params.get('mseed'), fallback.measurement.seed);
+
   return state;
 }
 
@@ -318,6 +349,15 @@ function decodeGeometryMeasure(
 ): GeometryMeasureMode {
   return raw !== null && (GEOMETRY_MEASURES as readonly string[]).includes(raw)
     ? (raw as GeometryMeasureMode)
+    : fallback;
+}
+
+function decodeMeasurementQuantity(
+  raw: string | null,
+  fallback: MeasurementQuantityMode,
+): MeasurementQuantityMode {
+  return raw !== null && (MEASUREMENT_QUANTITIES as readonly string[]).includes(raw)
+    ? (raw as MeasurementQuantityMode)
     : fallback;
 }
 

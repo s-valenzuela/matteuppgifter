@@ -37,6 +37,7 @@ describe('encodeState / decodeState', () => {
       geometry: createDefaultState().geometry,
       pattern: createDefaultState().pattern,
       equation: createDefaultState().equation,
+      measurement: createDefaultState().measurement,
       document: {
         header: { title: 'Läxa vecka 3', showName: false, showDate: true, instructions: '' },
         fontSizePt: 20,
@@ -77,6 +78,7 @@ describe('encodeState / decodeState', () => {
       geometry: createDefaultState().geometry,
       pattern: createDefaultState().pattern,
       equation: createDefaultState().equation,
+      measurement: createDefaultState().measurement,
       document: {
         header: { title: 'Läxa vecka 3', showName: false, showDate: true, instructions: '' },
         fontSizePt: 20,
@@ -387,6 +389,46 @@ describe('encodeState / decodeState', () => {
       const state = createDefaultState();
       state.sheetType = 'equation';
       state.equation.seed = 111;
+      state.generator.seed = 222;
+      expect(toDocumentConfig(state).seed).toBe(111);
+    });
+  });
+
+  describe('enhetsbytesblad', () => {
+    it('en avkodad standardkonfiguration för enhetsbytesblad återskapar exakt samma AppState', () => {
+      const state = createDefaultState();
+      state.sheetType = 'measurement';
+      const decoded = decodeState(`?${encodeState(state).toString()}`);
+      expect(decoded).toEqual(state);
+    });
+
+    it('kodar och avkodar alla enhetsbytesinställningar genom en tur-och-retur', () => {
+      const state = createDefaultState();
+      state.sheetType = 'measurement';
+      state.measurement = {
+        quantity: 'time',
+        valueRange: { min: 3, max: 150 },
+        count: 24,
+        avoidDuplicates: false,
+        seed: 555,
+      };
+
+      const decoded = decodeState(`?${encodeState(state).toString()}`);
+      expect(decoded?.measurement).toEqual(state.measurement);
+      expect(decoded?.sheetType).toBe('measurement');
+    });
+
+    it('faller tillbaka till standardvärden för skräpvärden i enhetsbytesfälten', () => {
+      const fallback = createDefaultState();
+      const decoded = decodeState('?add=0:10&mq=volm&mmin=abc');
+      expect(decoded?.measurement.quantity).toBe(fallback.measurement.quantity);
+      expect(decoded?.measurement.valueRange.min).toBe(fallback.measurement.valueRange.min);
+    });
+
+    it('sätter footer-seeden från measurement.seed när sheetType är "measurement"', () => {
+      const state = createDefaultState();
+      state.sheetType = 'measurement';
+      state.measurement.seed = 111;
       state.generator.seed = 222;
       expect(toDocumentConfig(state).seed).toBe(111);
     });

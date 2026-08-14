@@ -91,8 +91,9 @@ export interface DocumentConfig {
 }
 
 /** Vilken typ av blad som ska genereras — styr vilken av
- * generator/clock/fraction/geometry/pattern/equation som används. */
-export type SheetType = 'arithmetic' | 'clock' | 'fraction' | 'geometry' | 'pattern' | 'equation';
+ * generator/clock/fraction/geometry/pattern/equation/measurement som används. */
+export type SheetType =
+  'arithmetic' | 'clock' | 'fraction' | 'geometry' | 'pattern' | 'equation' | 'measurement';
 
 /**
  * Ett kryssbart minutmärke för klockuppgifter — flera kan vara påslagna
@@ -279,6 +280,41 @@ export interface EquationGeneratorConfig {
   /** Totalt antal uppgifter att generera. */
   count: number;
   /** Undvik dubbletter (samma räknesätt, tal och obekant plats) så länge poolen räcker till. */
+  avoidDuplicates: boolean;
+  /** Visas i sidfoten — separat seed, se motsvarande kommentar på ClockGeneratorConfig. */
+  seed: number;
+}
+
+/** Storhetstyperna som kan räknas om mellan enheter. Se core/measurement.ts
+ * för resp. enhetstabell (mm/cm/dm/m/km, g/hg/kg, ml/cl/dl/l, s/min/h). */
+export type MeasurementQuantity = 'length' | 'mass' | 'volume' | 'time';
+
+/** 'mixed' slumpar storhet per uppgift, se core/measurement.ts. */
+export type MeasurementQuantityMode = MeasurementQuantity | 'mixed';
+
+/**
+ * En enhetsbytesuppgift, t.ex. "3,5 m = ____ cm". `fromUnit`/`toUnit` är
+ * alltid GRANNAR i storhetens enhetstabell (t.ex. cm↔dm, inte mm↔km) — se
+ * core/measurement.ts för varför. `answerText` är redan omräknat OCH
+ * formaterat (kan ha ett "~"-prefix, se formatDecimal1) eftersom
+ * omräkningen inte alltid går jämnt ut (framför allt tid, där kvoten mellan
+ * enheter är 60 i stället för en tiopotens).
+ */
+export interface MeasurementProblem {
+  quantity: MeasurementQuantity;
+  fromValue: number;
+  fromUnit: string;
+  toUnit: string;
+  answerText: string;
+}
+
+export interface MeasurementGeneratorConfig {
+  quantity: MeasurementQuantityMode;
+  /** Talområde för det KÄNDA talet (fromValue) innan omräkning. */
+  valueRange: Range;
+  /** Totalt antal uppgifter att generera. */
+  count: number;
+  /** Undvik dubbletter (samma storhet, enheter och tal) så länge poolen räcker till. */
   avoidDuplicates: boolean;
   /** Visas i sidfoten — separat seed, se motsvarande kommentar på ClockGeneratorConfig. */
   seed: number;

@@ -13,6 +13,7 @@ const SHEET_TYPES: readonly SheetType[] = [
   'geometry',
   'pattern',
   'equation',
+  'measurement',
 ];
 
 /**
@@ -56,6 +57,7 @@ function normalizeState(state: AppState): AppState {
     geometry: state.geometry ?? fallback.geometry,
     pattern: state.pattern ?? fallback.pattern,
     equation: state.equation ?? fallback.equation,
+    measurement: state.measurement ?? fallback.measurement,
     document: {
       ...fallback.document,
       ...state.document,

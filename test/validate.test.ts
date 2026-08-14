@@ -6,6 +6,7 @@ import {
   validateEquationConfig,
   validateFractionConfig,
   validateGeometryConfig,
+  validateMeasurementConfig,
   validatePatternConfig,
 } from '../src/core/validate';
 import type {
@@ -13,6 +14,7 @@ import type {
   EquationGeneratorConfig,
   FractionGeneratorConfig,
   GeometryGeneratorConfig,
+  MeasurementGeneratorConfig,
   PatternGeneratorConfig,
 } from '../src/types';
 import { baseConfig, opConfig } from './helpers';
@@ -387,6 +389,55 @@ describe('validateEquationConfig', () => {
 
   it('varnar inte för en rimlig konfiguration', () => {
     const { warnings } = validateEquationConfig(baseEquationConfig());
+    expect(warnings).toEqual([]);
+  });
+});
+
+describe('validateMeasurementConfig', () => {
+  function baseMeasurementConfig(
+    overrides: Partial<MeasurementGeneratorConfig> = {},
+  ): MeasurementGeneratorConfig {
+    return {
+      quantity: 'length',
+      valueRange: { min: 1, max: 200 },
+      count: 10,
+      avoidDuplicates: true,
+      seed: 1,
+      ...overrides,
+    };
+  }
+
+  it('rätar ut ett negativt antal uppgifter och varnar', () => {
+    const { config, warnings } = validateMeasurementConfig(baseMeasurementConfig({ count: -3 }));
+    expect(config.count).toBe(0);
+    expect(warnings.some((w) => w.includes('Antalet uppgifter'))).toBe(true);
+  });
+
+  it('höjer talområdet under 1 till 1 och varnar', () => {
+    const { config, warnings } = validateMeasurementConfig(
+      baseMeasurementConfig({ valueRange: { min: -4, max: 0 } }),
+    );
+    expect(config.valueRange.min).toBeGreaterThanOrEqual(1);
+    expect(config.valueRange.max).toBeGreaterThanOrEqual(1);
+    expect(warnings.some((w) => w.includes('Talområdet'))).toBe(true);
+  });
+
+  it('vänder ett omvänt intervall rätt', () => {
+    const { config } = validateMeasurementConfig(
+      baseMeasurementConfig({ valueRange: { min: 12, max: 3 } }),
+    );
+    expect(config.valueRange.min).toBeLessThanOrEqual(config.valueRange.max);
+  });
+
+  it('varnar när fler unika uppgifter begärs än inställningarna rymmer', () => {
+    const { warnings } = validateMeasurementConfig(
+      baseMeasurementConfig({ quantity: 'mass', valueRange: { min: 1, max: 2 }, count: 40 }),
+    );
+    expect(warnings.some((w) => w.includes('unika uppgifter'))).toBe(true);
+  });
+
+  it('varnar inte för en rimlig konfiguration', () => {
+    const { warnings } = validateMeasurementConfig(baseMeasurementConfig());
     expect(warnings).toEqual([]);
   });
 });
