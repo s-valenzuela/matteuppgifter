@@ -10,12 +10,7 @@ import {
   validateFractionConfig,
   validateGeometryConfig,
 } from './core/validate';
-import {
-  renderClockSheetToPdf,
-  renderFractionSheetToPdf,
-  renderGeometrySheetToPdf,
-  renderProblemsToPdf,
-} from './pdf/render';
+import type * as RenderModule from './pdf/render';
 import { decodeState, encodeState } from './state/urlState';
 import { loadState, saveState } from './state/storage';
 import { mountForm } from './ui/form';
@@ -57,6 +52,24 @@ for (const preset of PRESETS) {
   quickstartContainer.appendChild(button);
 }
 
+/**
+ * pdf/render.ts drar med sig jsPDF, som ensam står för merparten av appens
+ * JS-vikt (jsPDF:s källa är över 800 kB oförminskad). Den behövs INTE för att
+ * rita upp och koppla in formuläret — bara för att faktiskt bygga en PDF —
+ * så den laddas här på begäran (Vites `import()`-kodklyvning) i stället för
+ * att vara en del av det skript som måste hämtas och köras innan sidan ens
+ * blir interaktiv. Modulen cachas i en delad promise så att bara det FÖRSTA
+ * anropet (regenerate() vid sidladdning) faktiskt väntar in nedladdningen —
+ * varje senare anrop (formulärändringar, Ladda ner, Skriv ut) återanvänder
+ * samma redan uppladdade modul.
+ */
+let renderModulePromise: Promise<typeof RenderModule> | undefined;
+
+function loadRenderModule(): Promise<typeof RenderModule> {
+  renderModulePromise ??= import('./pdf/render');
+  return renderModulePromise;
+}
+
 function renderWarnings(warnings: string[]): void {
   if (warnings.length === 0) {
     warningsContainer.innerHTML = '';
@@ -72,12 +85,14 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
-function regenerate(state: AppState): void {
+async function regenerate(state: AppState): Promise<void> {
+  const render = await loadRenderModule();
+
   if (state.sheetType === 'clock') {
     const { config, warnings } = validateClockConfig(state.clock);
     renderWarnings(warnings);
     preview.update(() =>
-      renderClockSheetToPdf(generateClockProblems(config), toDocumentConfig(state), config),
+      render.renderClockSheetToPdf(generateClockProblems(config), toDocumentConfig(state), config),
     );
     return;
   }
@@ -86,7 +101,11 @@ function regenerate(state: AppState): void {
     const { config, warnings } = validateFractionConfig(state.fraction);
     renderWarnings(warnings);
     preview.update(() =>
-      renderFractionSheetToPdf(generateFractionProblems(config), toDocumentConfig(state), config),
+      render.renderFractionSheetToPdf(
+        generateFractionProblems(config),
+        toDocumentConfig(state),
+        config,
+      ),
     );
     return;
   }
@@ -95,14 +114,20 @@ function regenerate(state: AppState): void {
     const { config, warnings } = validateGeometryConfig(state.geometry);
     renderWarnings(warnings);
     preview.update(() =>
-      renderGeometrySheetToPdf(generateGeometryProblems(config), toDocumentConfig(state), config),
+      render.renderGeometrySheetToPdf(
+        generateGeometryProblems(config),
+        toDocumentConfig(state),
+        config,
+      ),
     );
     return;
   }
 
   const { config, warnings } = validateConfig(state.generator);
   renderWarnings(warnings);
-  preview.update(() => renderProblemsToPdf(generateProblems(config), toDocumentConfig(state)));
+  preview.update(() =>
+    render.renderProblemsToPdf(generateProblems(config), toDocumentConfig(state)),
+  );
 }
 
 let copyLinkStatusTimeoutId: number | undefined;
@@ -118,15 +143,20 @@ function persistState(state: AppState): void {
   window.history.replaceState(null, '', url);
 }
 
-function buildCurrentPdf(): jsPDF {
+async function buildCurrentPdf(): Promise<jsPDF> {
+  const render = await loadRenderModule();
   const state = form.getState();
   if (state.sheetType === 'clock') {
     const { config } = validateClockConfig(state.clock);
-    return renderClockSheetToPdf(generateClockProblems(config), toDocumentConfig(state), config);
+    return render.renderClockSheetToPdf(
+      generateClockProblems(config),
+      toDocumentConfig(state),
+      config,
+    );
   }
   if (state.sheetType === 'fraction') {
     const { config } = validateFractionConfig(state.fraction);
-    return renderFractionSheetToPdf(
+    return render.renderFractionSheetToPdf(
       generateFractionProblems(config),
       toDocumentConfig(state),
       config,
@@ -134,14 +164,14 @@ function buildCurrentPdf(): jsPDF {
   }
   if (state.sheetType === 'geometry') {
     const { config } = validateGeometryConfig(state.geometry);
-    return renderGeometrySheetToPdf(
+    return render.renderGeometrySheetToPdf(
       generateGeometryProblems(config),
       toDocumentConfig(state),
       config,
     );
   }
   const { config } = validateConfig(state.generator);
-  return renderProblemsToPdf(generateProblems(config), toDocumentConfig(state));
+  return render.renderProblemsToPdf(generateProblems(config), toDocumentConfig(state));
 }
 
 function sanitizeFilename(title: string): string {
@@ -153,18 +183,26 @@ function sanitizeFilename(title: string): string {
 }
 
 downloadButton.addEventListener('click', () => {
-  const doc = buildCurrentPdf();
-  const filename = sanitizeFilename(form.getState().document.header.title) || 'matteuppgifter';
-  doc.save(`${filename}.pdf`);
+  void handleDownload();
 });
 
+async function handleDownload(): Promise<void> {
+  const doc = await buildCurrentPdf();
+  const filename = sanitizeFilename(form.getState().document.header.title) || 'matteuppgifter';
+  doc.save(`${filename}.pdf`);
+}
+
 printButton.addEventListener('click', () => {
-  const doc = buildCurrentPdf();
+  void handlePrint();
+});
+
+async function handlePrint(): Promise<void> {
+  const doc = await buildCurrentPdf();
   // output('bloburl') returnerar i praktiken en sträng, trots vad jsPDF:s
   // typer säger — se kommentaren i ui/preview.ts.
   const url = doc.output('bloburl') as unknown as string;
   window.open(url, '_blank');
-});
+}
 
 copyLinkButton.addEventListener('click', () => {
   void copyCurrentLink();
@@ -193,9 +231,9 @@ seedRandomizeButton.addEventListener('click', () => form.randomizeSeed());
 
 resetButton.addEventListener('click', () => form.setState(createDefaultState()));
 
-form.onChange(regenerate);
+form.onChange((state) => void regenerate(state));
 form.onChange(persistState);
-regenerate(form.getState());
+void regenerate(form.getState());
 persistState(form.getState());
 
 // Registrerar service workern (public/sw.js) så appen fungerar offline efter
