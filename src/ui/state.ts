@@ -95,6 +95,7 @@ export function createDefaultState(): AppState {
       answerStyle: 'blank',
       includeAnswerKey: true,
       exampleFirst: false,
+      showSeed: true,
     },
   };
 }

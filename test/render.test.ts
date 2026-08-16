@@ -73,6 +73,7 @@ function baseDocumentConfig(overrides: Partial<DocumentConfig> = {}): DocumentCo
     includeAnswerKey: false,
     exampleFirst: false,
     seed: 1,
+    showSeed: true,
     ...overrides,
   };
 }
@@ -100,6 +101,17 @@ describe('renderProblemsToPdf', () => {
   it('lämnar en enda tom sida med bara rubriken när inga uppgifter finns', () => {
     const doc = renderProblemsToPdf([], baseDocumentConfig());
     expect(doc.getNumberOfPages()).toBe(1);
+  });
+
+  it('döljer seeden i sidfoten när showSeed är false, utan att kasta fel — delad drawFooter, gäller alla bladtyper', () => {
+    const withSeed = renderProblemsToPdf([], baseDocumentConfig({ showSeed: true }));
+    const withoutSeed = renderProblemsToPdf([], baseDocumentConfig({ showSeed: false }));
+    expect(withoutSeed.getNumberOfPages()).toBe(1);
+    // Sidfoten blir kortare utan "· seed 12345" — en grov men tillräcklig
+    // signal på att texten faktiskt skiljer sig, utan att extrahera PDF-text.
+    expect(withoutSeed.output('arraybuffer').byteLength).toBeLessThan(
+      withSeed.output('arraybuffer').byteLength,
+    );
   });
 
   it('matchar sidantalet från layout-beräkningen för uppgiftssidorna', () => {

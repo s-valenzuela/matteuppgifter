@@ -98,6 +98,7 @@ export function encodeState(state: AppState): URLSearchParams {
   params.set('date', boolStr(state.document.header.showDate));
   params.set('instr', state.document.header.instructions);
   params.set('example', boolStr(state.document.exampleFirst));
+  params.set('showseed', boolStr(state.document.showSeed));
 
   params.set('cstep', state.clock.steps.join(','));
   params.set('cdir', state.clock.direction);
@@ -194,6 +195,7 @@ export function decodeState(search: string): AppState | null {
     fallback.document.header.instructions,
   );
   state.document.exampleFirst = boolOr(params.get('example'), fallback.document.exampleFirst);
+  state.document.showSeed = boolOr(params.get('showseed'), fallback.document.showSeed);
 
   state.clock.steps = decodeClockSteps(params.get('cstep'), fallback.clock.steps);
   state.clock.direction = decodeClockDirection(params.get('cdir'), fallback.clock.direction);

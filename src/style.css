@@ -208,6 +208,14 @@ h1 {
   margin: 0 0 0.6rem;
 }
 
+/* Markerar bladtyper som fortfarande finslipas (Talmönster, Ekvationer,
+   Mätning) — både i bladtyp-väljaren och i respektive avsnittsrubrik. */
+.beta-tag {
+  color: var(--text-muted);
+  font-size: 0.75em;
+  font-weight: normal;
+}
+
 fieldset {
   border: 1px solid var(--border-panel);
   border-radius: 8px;

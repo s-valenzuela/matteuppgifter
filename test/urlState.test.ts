@@ -46,6 +46,7 @@ describe('encodeState / decodeState', () => {
         answerStyle: 'box',
         includeAnswerKey: false,
         exampleFirst: false,
+        showSeed: true,
       },
     };
 
@@ -87,6 +88,7 @@ describe('encodeState / decodeState', () => {
         answerStyle: 'box',
         includeAnswerKey: false,
         exampleFirst: false,
+        showSeed: true,
       },
     };
 
@@ -183,6 +185,16 @@ describe('encodeState / decodeState', () => {
     const decoded = decodeState(`?${encodeState(state).toString()}`);
     expect(decoded?.document.header.instructions).toBe('Rita visarna.');
     expect(decoded?.document.exampleFirst).toBe(true);
+  });
+
+  it('kodar och avkodar showSeed genom en tur-och-retur (standard är synlig)', () => {
+    const defaultState = createDefaultState();
+    expect(defaultState.document.showSeed).toBe(true);
+
+    const state = createDefaultState();
+    state.document.showSeed = false;
+    const decoded = decodeState(`?${encodeState(state).toString()}`);
+    expect(decoded?.document.showSeed).toBe(false);
   });
 
   it('kodar och avkodar "Saknat tal"-läget', () => {
