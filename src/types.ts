@@ -88,6 +88,11 @@ export interface DocumentConfig {
   exampleFirst: boolean;
   /** Visas i sidfoten så att bladet kan återskapas från samma GeneratorConfig. */
   seed: number;
+  /** Skriv ut seeden i sidfoten (t.ex. "· seed 12345") — av som standard PÅ,
+   * men går att stänga av för den som tycker den bara skräpar ner bladet.
+   * Seeden fungerar likadant internt oavsett — det här styr bara om den
+   * SKRIVS UT, precis som showName/showDate i DocumentHeader. */
+  showSeed: boolean;
 }
 
 /** Vilken typ av blad som ska genereras — styr vilken av

@@ -70,11 +70,14 @@ describe('saveState / loadState', () => {
     delete legacyState.document.header.instructions;
     // @ts-expect-error se ovan
     delete legacyState.document.exampleFirst;
+    // @ts-expect-error simulerar JSON sparat innan showSeed fanns
+    delete legacyState.document.showSeed;
     localStorage.setItem('matteuppgifter:state:v1', JSON.stringify(legacyState));
 
     const loaded = loadState();
     expect(loaded?.document.header.instructions).toBe('');
     expect(loaded?.document.exampleFirst).toBe(false);
+    expect(loaded?.document.showSeed).toBe(true);
     // Fälten som FANNS ska inte skrivas över av standardvärdena.
     expect(loaded?.document.header.title).toBe(legacyState.document.header.title);
   });

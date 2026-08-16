@@ -109,7 +109,7 @@ export function renderProblemsToPdf(problems: Problem[], config: DocumentConfig)
   if (layout.pageCount === 0) {
     // Inga uppgifter att rita — lämna kvar en enda sida med bara rubriken.
     drawHeader(doc, config, null, false);
-    drawFooter(doc, 0, 1, config.seed);
+    drawFooter(doc, 0, 1, config);
     return doc;
   }
 
@@ -153,7 +153,7 @@ function renderSection(
         drawProblem(doc, problems[position.index], position, config, showAnswers, metrics);
       }
     }
-    drawFooter(doc, page, layout.pageCount, config.seed);
+    drawFooter(doc, page, layout.pageCount, config);
   }
 }
 
@@ -241,12 +241,14 @@ function drawHeader(
  * och därför mycket längre än den här). */
 const SITE_URL = 'https://www.matteuppgifter.se';
 
-function drawFooter(doc: jsPDF, page: number, totalPages: number, seed: number): void {
+function drawFooter(doc: jsPDF, page: number, totalPages: number, config: DocumentConfig): void {
   const { pageWidthMm, pageHeightMm, marginMm } = A4_METRICS;
   const y = pageHeightMm - marginMm / 2;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text(`Sida ${page + 1} av ${totalPages} · seed ${seed}`, pageWidthMm - marginMm, y, {
+  const pageText = `Sida ${page + 1} av ${totalPages}`;
+  const footerText = config.showSeed ? `${pageText} · seed ${config.seed}` : pageText;
+  doc.text(footerText, pageWidthMm - marginMm, y, {
     align: 'right',
   });
   // textWithLink (till skillnad från text()) lägger även till en klickbar
@@ -481,7 +483,7 @@ export function renderClockSheetToPdf(
 
   if (layout.pageCount === 0) {
     drawHeader(doc, config, null, false);
-    drawFooter(doc, 0, 1, config.seed);
+    drawFooter(doc, 0, 1, config);
     return doc;
   }
 
@@ -529,7 +531,7 @@ function renderClockSection(
         );
       }
     }
-    drawFooter(doc, page, layout.pageCount, config.seed);
+    drawFooter(doc, page, layout.pageCount, config);
   }
 }
 
@@ -818,7 +820,7 @@ export function renderFractionSheetToPdf(
 
   if (layout.pageCount === 0) {
     drawHeader(doc, config, null, false);
-    drawFooter(doc, 0, 1, config.seed);
+    drawFooter(doc, 0, 1, config);
     return doc;
   }
 
@@ -866,7 +868,7 @@ function renderFractionSection(
         );
       }
     }
-    drawFooter(doc, page, layout.pageCount, config.seed);
+    drawFooter(doc, page, layout.pageCount, config);
   }
 }
 
@@ -1316,7 +1318,7 @@ export function renderGeometrySheetToPdf(
 
   if (layout.pageCount === 0) {
     drawHeader(doc, config, null, false);
-    drawFooter(doc, 0, 1, config.seed);
+    drawFooter(doc, 0, 1, config);
     return doc;
   }
 
@@ -1364,7 +1366,7 @@ function renderGeometrySection(
         );
       }
     }
-    drawFooter(doc, page, layout.pageCount, config.seed);
+    drawFooter(doc, page, layout.pageCount, config);
   }
 }
 
@@ -1521,7 +1523,7 @@ export function renderPatternSheetToPdf(
 
   if (layout.pageCount === 0) {
     drawHeader(doc, config, null, false);
-    drawFooter(doc, 0, 1, config.seed);
+    drawFooter(doc, 0, 1, config);
     return doc;
   }
 
@@ -1569,7 +1571,7 @@ function renderPatternSection(
         drawPatternProblem(doc, problems[position.index], position, config, showAnswers, metrics);
       }
     }
-    drawFooter(doc, page, layout.pageCount, config.seed);
+    drawFooter(doc, page, layout.pageCount, config);
   }
 }
 
@@ -1653,7 +1655,7 @@ export function renderEquationSheetToPdf(
 
   if (layout.pageCount === 0) {
     drawHeader(doc, config, null, false);
-    drawFooter(doc, 0, 1, config.seed);
+    drawFooter(doc, 0, 1, config);
     return doc;
   }
 
@@ -1692,7 +1694,7 @@ function renderEquationSection(
         drawEquationProblem(doc, problems[position.index], position, layout, config, showAnswers);
       }
     }
-    drawFooter(doc, page, layout.pageCount, config.seed);
+    drawFooter(doc, page, layout.pageCount, config);
   }
 }
 
@@ -1763,7 +1765,7 @@ export function renderMeasurementSheetToPdf(
 
   if (layout.pageCount === 0) {
     drawHeader(doc, config, null, false);
-    drawFooter(doc, 0, 1, config.seed);
+    drawFooter(doc, 0, 1, config);
     return doc;
   }
 
@@ -1809,7 +1811,7 @@ function renderMeasurementSection(
         );
       }
     }
-    drawFooter(doc, page, layout.pageCount, config.seed);
+    drawFooter(doc, page, layout.pageCount, config);
   }
 }
 

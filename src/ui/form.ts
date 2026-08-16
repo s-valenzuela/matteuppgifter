@@ -199,6 +199,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const showDateEl = q<HTMLInputElement>(container, '#showDate');
   const instructionsEl = q<HTMLInputElement>(container, '#instructions');
   const exampleFirstEl = q<HTMLInputElement>(container, '#exampleFirst');
+  const showSeedEl = q<HTMLInputElement>(container, '#showSeed');
 
   function emitChange(): void {
     for (const listener of listeners) {
@@ -348,6 +349,7 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     showDateEl.checked = state.document.header.showDate;
     instructionsEl.value = state.document.header.instructions;
     exampleFirstEl.checked = state.document.exampleFirst;
+    showSeedEl.checked = state.document.showSeed;
   }
 
   /**
@@ -748,6 +750,10 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     state.document.exampleFirst = exampleFirstEl.checked;
     emitChange();
   });
+  showSeedEl.addEventListener('change', () => {
+    state.document.showSeed = showSeedEl.checked;
+    emitChange();
+  });
 
   refreshFromState();
 
@@ -872,9 +878,9 @@ function renderTemplate(): string {
         <label><input type="radio" name="sheetType" value="clock" /> Klockan</label>
         <label><input type="radio" name="sheetType" value="fraction" /> Bråk</label>
         <label><input type="radio" name="sheetType" value="geometry" /> Geometri</label>
-        <label><input type="radio" name="sheetType" value="pattern" /> Talmönster</label>
-        <label><input type="radio" name="sheetType" value="equation" /> Ekvationer</label>
-        <label><input type="radio" name="sheetType" value="measurement" /> Mätning</label>
+        <label><input type="radio" name="sheetType" value="pattern" /> Talmönster <span class="beta-tag">(beta)</span></label>
+        <label><input type="radio" name="sheetType" value="equation" /> Ekvationer <span class="beta-tag">(beta)</span></label>
+        <label><input type="radio" name="sheetType" value="measurement" /> Mätning <span class="beta-tag">(beta)</span></label>
       </div>
     </section>
 
@@ -957,7 +963,7 @@ function renderTemplate(): string {
     </section>
 
     <section aria-labelledby="pattern-heading" id="pattern-section">
-      <h2 id="pattern-heading">Talmönster</h2>
+      <h2 id="pattern-heading">Talmönster <span class="beta-tag">(beta)</span></h2>
       <div class="field-grid" id="pattern-steps">
         <span class="level-chips-label">Steg:</span>
         ${patternStepCheckboxes}
@@ -974,7 +980,7 @@ function renderTemplate(): string {
     </section>
 
     <section aria-labelledby="equation-heading" id="equation-section">
-      <h2 id="equation-heading">Ekvationer</h2>
+      <h2 id="equation-heading">Ekvationer <span class="beta-tag">(beta)</span></h2>
       <div class="field-grid" id="equation-operations">
         <span class="level-chips-label">Räknesätt:</span>
         ${equationOperationCheckboxes}
@@ -987,7 +993,7 @@ function renderTemplate(): string {
     </section>
 
     <section aria-labelledby="measurement-heading" id="measurement-section">
-      <h2 id="measurement-heading">Mätning</h2>
+      <h2 id="measurement-heading">Mätning <span class="beta-tag">(beta)</span></h2>
       <div class="field-grid">
         <label>Storhet
           <select id="measurement-quantity">${measurementQuantityOptions}</select>
@@ -1048,6 +1054,7 @@ function renderTemplate(): string {
         <label id="shuffle-field"><input type="checkbox" id="shuffle" /> Blanda ordningen</label>
         <label id="missingNumber-field"><input type="checkbox" id="missingNumber" /> Saknat tal (t.ex. 3 + __ = 10)</label>
         <label><input type="checkbox" id="exampleFirst" /> Lös första uppgiften som exempel</label>
+        <label><input type="checkbox" id="showSeed" /> Visa seed i sidfoten</label>
       </div>
       <label>
         Seed
