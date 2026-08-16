@@ -22,6 +22,7 @@ import { loadState, saveState } from './state/storage';
 import { mountForm } from './ui/form';
 import { mountPreview } from './ui/preview';
 import { PRESETS } from './ui/presets';
+import { mountQuickstart } from './ui/quickstart';
 import { createDefaultState, toDocumentConfig, type AppState } from './ui/state';
 
 function mustQuery<T extends Element>(selector: string): T {
@@ -50,13 +51,7 @@ const initialState = decodeState(window.location.search) ?? loadState() ?? creat
 const form = mountForm(settingsPanel, initialState);
 const preview = mountPreview(previewFrame);
 
-for (const preset of PRESETS) {
-  const button = document.createElement('button');
-  button.type = 'button';
-  button.textContent = preset.label;
-  button.addEventListener('click', () => form.setState(preset.build()));
-  quickstartContainer.appendChild(button);
-}
+mountQuickstart(quickstartContainer, PRESETS, (preset) => form.setState(preset.build()));
 
 /**
  * pdf/render.ts drar med sig jsPDF, som ensam står för merparten av appens
