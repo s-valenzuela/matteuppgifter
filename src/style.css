@@ -116,10 +116,13 @@ h1 {
 }
 
 .quickstart {
+  margin-bottom: 1.5rem;
+}
+
+.quickstart-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-bottom: 1.5rem;
 }
 
 .quickstart button {
@@ -134,6 +137,46 @@ h1 {
 
 .quickstart button:hover {
   background: var(--accent-bg-hover);
+}
+
+/* Expandern som göms de icke-utvalda presetsen bakom (se mountQuickstart i
+   ui/quickstart.ts) — öppen som standard på breda skärmar. */
+.quickstart-more {
+  margin-top: 0.5rem;
+}
+
+.quickstart-more summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  list-style: none;
+  user-select: none;
+}
+
+.quickstart-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.quickstart-more summary::before {
+  content: '▸';
+  display: inline-block;
+  font-size: 0.7em;
+  transition: transform 0.15s ease;
+}
+
+.quickstart-more[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.quickstart-more summary:hover {
+  color: var(--text);
+}
+
+.quickstart-more .quickstart-row {
+  margin-top: 0.5rem;
 }
 
 .app-layout {

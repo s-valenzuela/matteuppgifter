@@ -4,12 +4,18 @@ export interface Preset {
   id: string;
   label: string;
   build: () => AppState;
+  /** Visas direkt i snabbstartsraden, utan att öppna "Fler snabbstartsval".
+   * En handfull (helst en per bladtyp) så att alla sju bladtyperna syns med
+   * en gång utan att raden svämmar över — resten göms bakom expandern, se
+   * mountForm i ui/form.ts. */
+  featured?: boolean;
 }
 
 export const PRESETS: Preset[] = [
   {
     id: 'add-0-10',
     label: 'Addition 0–10',
+    featured: true,
     build: () => {
       const state = createDefaultState();
       state.generator.operations = {
@@ -62,6 +68,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'clock-hour-half',
     label: 'Klockan hel & halv',
+    featured: true,
     build: () => {
       const state = createDefaultState();
       state.sheetType = 'clock';
@@ -98,6 +105,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'fraction-circle',
     label: 'Bråk cirkel',
+    featured: true,
     build: () => {
       const state = createDefaultState();
       state.sheetType = 'fraction';
@@ -128,6 +136,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'geometry-area',
     label: 'Area rektangel',
+    featured: true,
     build: () => {
       const state = createDefaultState();
       state.sheetType = 'geometry';
@@ -156,6 +165,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'pattern-ascending',
     label: 'Talföljder uppåt',
+    featured: true,
     build: () => {
       const state = createDefaultState();
       state.sheetType = 'pattern';
@@ -182,6 +192,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'equation-add-sub',
     label: 'Ekvationer + och −',
+    featured: true,
     build: () => {
       const state = createDefaultState();
       state.sheetType = 'equation';
@@ -210,6 +221,7 @@ export const PRESETS: Preset[] = [
   {
     id: 'measurement-length',
     label: 'Enhetsbyten längd',
+    featured: true,
     build: () => {
       const state = createDefaultState();
       state.sheetType = 'measurement';
