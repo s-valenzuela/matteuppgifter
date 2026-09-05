@@ -1,4 +1,5 @@
 import { FRACTION_DENOMINATORS } from '../core/fractions';
+import { MEASUREMENT_UNITS } from '../core/measurement';
 import type {
   ClockDirectionMode,
   ClockGeneratorConfig,
@@ -233,6 +234,12 @@ function createDefaultEquationConfig(): EquationGeneratorConfig {
 function createDefaultMeasurementConfig(): MeasurementGeneratorConfig {
   return {
     quantity: 'length',
+    units: {
+      length: [...MEASUREMENT_UNITS.length],
+      mass: [...MEASUREMENT_UNITS.mass],
+      volume: [...MEASUREMENT_UNITS.volume],
+      time: [...MEASUREMENT_UNITS.time],
+    },
     valueRange: { min: 1, max: 200 },
     count: 10,
     avoidDuplicates: true,

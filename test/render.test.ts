@@ -4,7 +4,7 @@ import { FRACTION_DENOMINATORS, generateFractionProblems } from '../src/core/fra
 import { generateProblems } from '../src/core/generate';
 import { generateEquationProblems } from '../src/core/equations';
 import { generateGeometryProblems } from '../src/core/geometry';
-import { generateMeasurementProblems } from '../src/core/measurement';
+import { generateMeasurementProblems, MEASUREMENT_UNITS } from '../src/core/measurement';
 import { generatePatternProblems } from '../src/core/patterns';
 import { A4_METRICS, computeGridLayout, computeHeaderHeightMm } from '../src/pdf/layout';
 import {
@@ -1020,6 +1020,12 @@ describe('renderMeasurementSheetToPdf', () => {
   ): MeasurementGeneratorConfig {
     return {
       quantity: 'mixed',
+      units: {
+        length: [...MEASUREMENT_UNITS.length],
+        mass: [...MEASUREMENT_UNITS.mass],
+        volume: [...MEASUREMENT_UNITS.volume],
+        time: [...MEASUREMENT_UNITS.time],
+      },
       valueRange: { min: 1, max: 200 },
       count: 9,
       avoidDuplicates: true,

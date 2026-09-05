@@ -323,6 +323,16 @@ export interface MeasurementProblem {
 
 export interface MeasurementGeneratorConfig {
   quantity: MeasurementQuantityMode;
+  /**
+   * Vilka enheter (symboler, t.ex. "cm") som får förekomma, per storhet —
+   * filtrerar storhetens fulla enhetstabell (se MEASUREMENT_UNITS i
+   * core/measurement.ts). Bara GRANNAR i den kvarvarande, filtrerade listan
+   * paras ihop i en uppgift, precis som i den ofiltrerade tabellen — en
+   * storhet med färre än två kvarvarande enheter kan inte bilda något par
+   * och faller därför bort (i "blandat"-läge) eller tillbaka till alla
+   * enheter (annars), se validateMeasurementConfig.
+   */
+  units: Record<MeasurementQuantity, string[]>;
   /** Talområde för det KÄNDA talet (fromValue) innan omräkning. */
   valueRange: Range;
   /** Totalt antal uppgifter att generera. */

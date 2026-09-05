@@ -57,7 +57,18 @@ function normalizeState(state: AppState): AppState {
     geometry: state.geometry ?? fallback.geometry,
     pattern: state.pattern ?? fallback.pattern,
     equation: state.equation ?? fallback.equation,
-    measurement: state.measurement ?? fallback.measurement,
+    // measurement.units tillkom efter att enhetsbytesbladet redan fanns, så
+    // ett sparat tillstånd kan ha hela `measurement` men sakna just `units`
+    // (till skillnad från clock/fraction/... ovan, som helt saknas hos ett
+    // tillstånd sparat innan DE fanns) — samma "fyll på det som saknas"-behov
+    // som document.header nedan, bara ett steg djupare.
+    measurement: state.measurement
+      ? {
+          ...fallback.measurement,
+          ...state.measurement,
+          units: state.measurement.units ?? fallback.measurement.units,
+        }
+      : fallback.measurement,
     document: {
       ...fallback.document,
       ...state.document,

@@ -1,4 +1,5 @@
 import { FRACTION_DENOMINATORS } from '../core/fractions';
+import { MEASUREMENT_UNITS } from '../core/measurement';
 import type {
   AnswerStyle,
   ClockDirectionMode,
@@ -8,6 +9,7 @@ import type {
   FractionShapeMode,
   GeometryMeasureMode,
   GeometryShapeMode,
+  MeasurementQuantity,
   MeasurementQuantityMode,
   Operation,
   OperationConfig,
@@ -46,7 +48,7 @@ const FRACTION_DIRECTIONS: readonly FractionDirectionMode[] = [
   'toPercent',
   'mixed',
 ];
-const MEASUREMENT_QUANTITIES: readonly MeasurementQuantityMode[] = [
+const MEASUREMENT_QUANTITY_MODES: readonly MeasurementQuantityMode[] = [
   'length',
   'mass',
   'volume',
@@ -145,6 +147,10 @@ export function encodeState(state: AppState): URLSearchParams {
   params.set('eseed', String(state.equation.seed));
 
   params.set('mq', state.measurement.quantity);
+  params.set('mulen', state.measurement.units.length.join(','));
+  params.set('mumass', state.measurement.units.mass.join(','));
+  params.set('muvol', state.measurement.units.volume.join(','));
+  params.set('mutime', state.measurement.units.time.join(','));
   params.set('mmin', String(state.measurement.valueRange.min));
   params.set('mmax', String(state.measurement.valueRange.max));
   params.set('mn', String(state.measurement.count));
@@ -259,6 +265,20 @@ export function decodeState(search: string): AppState | null {
     params.get('mq'),
     fallback.measurement.quantity,
   );
+  state.measurement.units = {
+    length: decodeMeasurementUnits(
+      'length',
+      params.get('mulen'),
+      fallback.measurement.units.length,
+    ),
+    mass: decodeMeasurementUnits('mass', params.get('mumass'), fallback.measurement.units.mass),
+    volume: decodeMeasurementUnits(
+      'volume',
+      params.get('muvol'),
+      fallback.measurement.units.volume,
+    ),
+    time: decodeMeasurementUnits('time', params.get('mutime'), fallback.measurement.units.time),
+  };
   state.measurement.valueRange = {
     min: intOr(params.get('mmin'), fallback.measurement.valueRange.min),
     max: intOr(params.get('mmax'), fallback.measurement.valueRange.max),
@@ -358,9 +378,25 @@ function decodeMeasurementQuantity(
   raw: string | null,
   fallback: MeasurementQuantityMode,
 ): MeasurementQuantityMode {
-  return raw !== null && (MEASUREMENT_QUANTITIES as readonly string[]).includes(raw)
+  return raw !== null && (MEASUREMENT_QUANTITY_MODES as readonly string[]).includes(raw)
     ? (raw as MeasurementQuantityMode)
     : fallback;
+}
+
+/** Kommaseparerad lista av ikryssade enheter för en storhet, samma princip
+ * som decodeFractionDenominators — en tom eller helt ogiltig lista faller
+ * tillbaka i sin helhet, eftersom en storhet med färre än två enheter inte
+ * kan bilda något enhetspar (se resolveUsableQuantities i
+ * core/measurement.ts). */
+function decodeMeasurementUnits(
+  quantity: MeasurementQuantity,
+  raw: string | null,
+  fallback: string[],
+): string[] {
+  if (raw === null) return fallback;
+  const allowed = MEASUREMENT_UNITS[quantity];
+  const units = raw.split(',').filter((symbol) => allowed.includes(symbol));
+  return units.length >= 2 ? units : fallback;
 }
 
 /** Kommaseparerad lista av ikryssade steg, samma princip som

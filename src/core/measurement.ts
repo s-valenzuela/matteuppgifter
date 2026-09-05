@@ -56,7 +56,22 @@ const QUANTITY_UNITS: Record<MeasurementQuantity, readonly UnitDef[]> = {
   time: TIME_UNITS,
 };
 
-const ALL_QUANTITIES: readonly MeasurementQuantity[] = ['length', 'mass', 'volume', 'time'];
+export const MEASUREMENT_QUANTITIES: readonly MeasurementQuantity[] = [
+  'length',
+  'mass',
+  'volume',
+  'time',
+];
+
+/** Enhetssymbolerna per storhet, i samma ordning (finaste enhet först) som
+ * QUANTITY_UNITS — exporteras för att bygga kryssrutorna i ui/form.ts och
+ * standardvalet (alla enheter ikryssade) i ui/state.ts. */
+export const MEASUREMENT_UNITS: Record<MeasurementQuantity, readonly string[]> = {
+  length: LENGTH_UNITS.map((u) => u.symbol),
+  mass: MASS_UNITS.map((u) => u.symbol),
+  volume: VOLUME_UNITS.map((u) => u.symbol),
+  time: TIME_UNITS.map((u) => u.symbol),
+};
 
 export function generateMeasurementProblems(
   config: MeasurementGeneratorConfig,
@@ -66,19 +81,24 @@ export function generateMeasurementProblems(
   }
 
   const range = normalizeValueRange(config.valueRange);
+  const usable = resolveUsableQuantities(config);
+  if (Object.keys(usable).length === 0) {
+    return [];
+  }
+
   const rng = mulberry32(config.seed);
   const seen = config.avoidDuplicates ? new Set<string>() : undefined;
 
   const problems: MeasurementProblem[] = [];
   for (let i = 0; i < config.count; i++) {
-    let problem = createProblem(config.quantity, range, rng);
+    let problem = createProblem(config.quantity, usable, range, rng);
 
     if (seen) {
       let attempt = 0;
       // Samma "fyll på med upprepningar i stället för att hänga"-princip som
       // core/geometry.ts och core/patterns.ts.
       while (seen.has(measurementKey(problem)) && attempt < MAX_ATTEMPTS) {
-        problem = createProblem(config.quantity, range, rng);
+        problem = createProblem(config.quantity, usable, range, rng);
         attempt++;
       }
       seen.add(measurementKey(problem));
@@ -88,6 +108,29 @@ export function generateMeasurementProblems(
   }
 
   return problems;
+}
+
+/**
+ * De storheter som faktiskt går att generera uppgifter för, utifrån
+ * config.units filtrerat mot MEASUREMENT_UNITS — en storhet med färre än två
+ * kvarvarande enheter kan inte bilda något par och hoppas därför över här.
+ * Robust även om validateMeasurementConfig av någon anledning inte redan
+ * rättat till det (se generateClockProblems för samma "hoppa över tomma
+ * pooler i stället för att krascha"-princip).
+ */
+function resolveUsableQuantities(
+  config: MeasurementGeneratorConfig,
+): Partial<Record<MeasurementQuantity, readonly UnitDef[]>> {
+  const wanted = config.quantity === 'mixed' ? MEASUREMENT_QUANTITIES : [config.quantity];
+  const result: Partial<Record<MeasurementQuantity, readonly UnitDef[]>> = {};
+  for (const quantity of wanted) {
+    const allowed = new Set(config.units[quantity]);
+    const filtered = QUANTITY_UNITS[quantity].filter((u) => allowed.has(u.symbol));
+    if (filtered.length >= 2) {
+      result[quantity] = filtered;
+    }
+  }
+  return result;
 }
 
 /**
@@ -102,9 +145,14 @@ export function generateMeasurementProblems(
  * grovt→fint: svaret är alltid EXAKT (en multiplikation, aldrig en division),
  * så det finns aldrig något att runda där.
  */
-function createProblem(mode: MeasurementQuantityMode, range: Range, rng: Rng): MeasurementProblem {
-  const quantity = resolveQuantity(mode, rng);
-  const units = QUANTITY_UNITS[quantity];
+function createProblem(
+  mode: MeasurementQuantityMode,
+  usable: Partial<Record<MeasurementQuantity, readonly UnitDef[]>>,
+  range: Range,
+  rng: Rng,
+): MeasurementProblem {
+  const quantity = resolveQuantity(mode, usable, rng);
+  const units = usable[quantity]!;
   const pairIndex = randomInt(rng, 0, units.length - 2);
   const fineUnit = units[pairIndex];
   const coarseUnit = units[pairIndex + 1];
@@ -133,8 +181,14 @@ function createProblem(mode: MeasurementQuantityMode, range: Range, rng: Rng): M
   };
 }
 
-function resolveQuantity(mode: MeasurementQuantityMode, rng: Rng): MeasurementQuantity {
-  return mode === 'mixed' ? pick(rng, ALL_QUANTITIES) : mode;
+function resolveQuantity(
+  mode: MeasurementQuantityMode,
+  usable: Partial<Record<MeasurementQuantity, readonly UnitDef[]>>,
+  rng: Rng,
+): MeasurementQuantity {
+  return mode === 'mixed'
+    ? pick(rng, Object.keys(usable) as MeasurementQuantity[])
+    : (mode as MeasurementQuantity);
 }
 
 function measurementKey(problem: MeasurementProblem): string {
@@ -158,11 +212,11 @@ function normalizeValueRange(range: Range): Range {
 export function measurementPoolSize(config: MeasurementGeneratorConfig): number {
   const { min, max } = normalizeValueRange(config.valueRange);
   const size = max - min + 1;
-  const quantities = config.quantity === 'mixed' ? ALL_QUANTITIES : [config.quantity];
+  const usable = resolveUsableQuantities(config);
 
   let total = 0;
-  for (const quantity of quantities) {
-    const unitPairs = QUANTITY_UNITS[quantity].length - 1;
+  for (const units of Object.values(usable)) {
+    const unitPairs = units.length - 1;
     // Två riktningar (fint→grovt, grovt→fint) per enhetspar.
     total += unitPairs * 2 * size;
   }

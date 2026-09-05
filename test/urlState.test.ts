@@ -435,6 +435,12 @@ describe('encodeState / decodeState', () => {
       state.sheetType = 'measurement';
       state.measurement = {
         quantity: 'time',
+        units: {
+          length: ['mm', 'cm', 'dm', 'm', 'km'],
+          mass: ['g', 'hg', 'kg'],
+          volume: ['ml', 'cl', 'dl', 'l'],
+          time: ['min', 'h'],
+        },
         valueRange: { min: 3, max: 150 },
         count: 24,
         avoidDuplicates: false,
@@ -451,6 +457,27 @@ describe('encodeState / decodeState', () => {
       const decoded = decodeState('?add=0:10&mq=volm&mmin=abc');
       expect(decoded?.measurement.quantity).toBe(fallback.measurement.quantity);
       expect(decoded?.measurement.valueRange.min).toBe(fallback.measurement.valueRange.min);
+    });
+
+    it('behåller ett begränsat enhetsval per storhet genom en tur-och-retur', () => {
+      const state = createDefaultState();
+      state.sheetType = 'measurement';
+      state.measurement.units.length = ['cm', 'm'];
+      state.measurement.units.time = ['min', 'h'];
+
+      const decoded = decodeState(`?${encodeState(state).toString()}`);
+      expect(decoded?.measurement.units.length).toEqual(['cm', 'm']);
+      expect(decoded?.measurement.units.time).toEqual(['min', 'h']);
+      // Ej ändrade storheter ska fortfarande vara oförändrade (alla enheter).
+      expect(decoded?.measurement.units.mass).toEqual(createDefaultState().measurement.units.mass);
+    });
+
+    it('faller tillbaka till alla enheter för ett ogiltigt eller otillräckligt enhetsval', () => {
+      const fallback = createDefaultState();
+      // "xyz" är ingen giltig längdenhet, och "cm" ensam räcker inte för att
+      // bilda ett enhetspar — båda fallen ska falla tillbaka till alla enheter.
+      const decoded = decodeState('?add=0:10&mulen=xyz,cm');
+      expect(decoded?.measurement.units.length).toEqual(fallback.measurement.units.length);
     });
 
     it('sätter footer-seeden från measurement.seed när sheetType är "measurement"', () => {
