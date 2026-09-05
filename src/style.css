@@ -312,6 +312,14 @@ legend {
   margin-bottom: 0.6rem;
 }
 
+/* Samma problem, och samma lösning, som label[hidden] nedan: display: grid
+ * ovan vinner annars över webbläsarens inbyggda [hidden]-stil (samma
+ * specificitet, författarens stilmall vinner) — läcker t.ex. mätningens
+ * enhetskryssrutor för storheter som inte är valda. */
+.field-grid[hidden] {
+  display: none;
+}
+
 @media (max-width: 480px) {
   .field-grid {
     grid-template-columns: 1fr;

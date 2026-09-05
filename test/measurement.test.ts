@@ -1,12 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { generateMeasurementProblems, measurementPoolSize } from '../src/core/measurement';
+import {
+  generateMeasurementProblems,
+  MEASUREMENT_UNITS,
+  measurementPoolSize,
+} from '../src/core/measurement';
 import type { MeasurementGeneratorConfig, MeasurementQuantity } from '../src/types';
+
+function allUnits(): Record<MeasurementQuantity, string[]> {
+  return {
+    length: [...MEASUREMENT_UNITS.length],
+    mass: [...MEASUREMENT_UNITS.mass],
+    volume: [...MEASUREMENT_UNITS.volume],
+    time: [...MEASUREMENT_UNITS.time],
+  };
+}
 
 function baseConfig(
   overrides: Partial<MeasurementGeneratorConfig> = {},
 ): MeasurementGeneratorConfig {
   return {
     quantity: 'mixed',
+    units: allUnits(),
     valueRange: { min: 1, max: 200 },
     count: 12,
     avoidDuplicates: true,
@@ -153,6 +167,74 @@ describe('generateMeasurementProblems', () => {
       baseConfig({ quantity: 'mass', valueRange: { min: 1, max: 2 }, count: 40 }),
     );
     expect(problems).toHaveLength(40);
+  });
+});
+
+describe('units (valfria enheter per storhet)', () => {
+  it('använder bara de ikryssade enheterna för en storhet', () => {
+    const problems = generateMeasurementProblems(
+      baseConfig({
+        quantity: 'length',
+        units: { ...allUnits(), length: ['cm', 'm'] },
+        count: 40,
+        avoidDuplicates: false,
+      }),
+    );
+    for (const p of problems) {
+      expect(['cm', 'm']).toContain(p.fromUnit);
+      expect(['cm', 'm']).toContain(p.toUnit);
+    }
+  });
+
+  it('parar ihop kvarvarande enheter direkt när en mellanliggande enhet är avstängd', () => {
+    // mm↔m är inte grannar i den FULLA tabellen (mm,cm,dm,m,km), men blir det
+    // i den FILTRERADE — se resolveUsableQuantities i core/measurement.ts.
+    const problems = generateMeasurementProblems(
+      baseConfig({
+        quantity: 'length',
+        units: { ...allUnits(), length: ['mm', 'm'] },
+        count: 40,
+        avoidDuplicates: false,
+      }),
+    );
+    expect(problems.length).toBeGreaterThan(0);
+    for (const p of problems) {
+      expect(new Set([p.fromUnit, p.toUnit])).toEqual(new Set(['mm', 'm']));
+    }
+  });
+
+  it('hoppar över en storhet i "blandat"-läge om den har färre än två ikryssade enheter', () => {
+    const problems = generateMeasurementProblems(
+      baseConfig({
+        quantity: 'mixed',
+        units: { ...allUnits(), mass: ['g'] },
+        count: 100,
+        avoidDuplicates: false,
+        seed: 11,
+      }),
+    );
+    expect(problems.some((p) => p.quantity === 'mass')).toBe(false);
+    expect(problems.length).toBe(100);
+  });
+
+  it('returnerar en tom lista, kraschar inte, om den valda (icke-blandade) storheten har färre än två ikryssade enheter', () => {
+    const problems = generateMeasurementProblems(
+      baseConfig({
+        quantity: 'mass',
+        units: { ...allUnits(), mass: ['g'] },
+        count: 20,
+      }),
+    );
+    expect(problems).toEqual([]);
+  });
+
+  it('measurementPoolSize minskar när färre enheter är ikryssade', () => {
+    const full = measurementPoolSize(baseConfig({ quantity: 'length' }));
+    const restricted = measurementPoolSize(
+      baseConfig({ quantity: 'length', units: { ...allUnits(), length: ['cm', 'm'] } }),
+    );
+    expect(restricted).toBeLessThan(full);
+    expect(restricted).toBeGreaterThan(0);
   });
 });
 

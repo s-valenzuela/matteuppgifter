@@ -1,4 +1,5 @@
 import { FRACTION_DENOMINATORS } from '../core/fractions';
+import { MEASUREMENT_QUANTITIES, MEASUREMENT_UNITS } from '../core/measurement';
 import type {
   AnswerStyle,
   ClockDirectionMode,
@@ -8,6 +9,7 @@ import type {
   FractionShapeMode,
   GeometryMeasureMode,
   GeometryShapeMode,
+  MeasurementQuantity,
   MeasurementQuantityMode,
   Operation,
   SheetType,
@@ -78,6 +80,18 @@ const MEASUREMENT_QUANTITY_LABELS: Record<MeasurementQuantityMode, string> = {
   volume: 'Volym (ml/cl/dl/l)',
   time: 'Tid (s/min/h)',
   mixed: 'Blandat',
+};
+
+/** Kort etikett per storhet, till enhetskryssrutornas rubrik — till skillnad
+ * från MEASUREMENT_QUANTITY_LABELS (som räknar upp enheterna i klartext,
+ * meningsfullt när enheterna INTE går att kryssa i/ur) behövs bara namnet
+ * här eftersom kryssrutorna nedanför redan visar exakt vilka enheter som
+ * finns. */
+const MEASUREMENT_QUANTITY_SHORT_LABELS: Record<MeasurementQuantity, string> = {
+  length: 'Längd',
+  mass: 'Massa',
+  volume: 'Volym',
+  time: 'Tid',
 };
 
 // Feather-ikon (MIT), inbäddad som inline-SVG istället för en extern ikonfil
@@ -181,6 +195,23 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
   const measurementQuantityEl = q<HTMLSelectElement>(container, '#measurement-quantity');
   const measurementMinEl = q<HTMLInputElement>(container, '#measurement-min');
   const measurementMaxEl = q<HTMLInputElement>(container, '#measurement-max');
+  const measurementUnitFields = new Map(
+    MEASUREMENT_QUANTITIES.map((quantity) => [
+      quantity,
+      q<HTMLElement>(container, `#measurement-units-${quantity}`),
+    ]),
+  );
+  const measurementUnitEls = new Map(
+    MEASUREMENT_QUANTITIES.map((quantity) => [
+      quantity,
+      new Map(
+        MEASUREMENT_UNITS[quantity].map((symbol) => [
+          symbol,
+          q<HTMLInputElement>(container, `#measurement-unit-${quantity}-${symbol}`),
+        ]),
+      ),
+    ]),
+  );
 
   const countEl = q<HTMLInputElement>(container, '#count');
   const avoidDuplicatesEl = q<HTMLInputElement>(container, '#avoidDuplicates');
@@ -332,6 +363,19 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     measurementQuantityEl.value = state.measurement.quantity;
     measurementMinEl.value = String(state.measurement.valueRange.min);
     measurementMaxEl.value = String(state.measurement.valueRange.max);
+    for (const [quantity, units] of measurementUnitEls) {
+      for (const [symbol, el] of units) {
+        el.checked = state.measurement.units[quantity].includes(symbol);
+      }
+      // Bara den/de storheter som faktiskt är i bruk (den valda, eller alla
+      // fyra i "blandat"-läge) visar sina enhetskryssrutor — samma princip
+      // som fractionShapeField/fractionShowPercentField ovan.
+      const field = measurementUnitFields.get(quantity);
+      if (field) {
+        field.hidden =
+          state.measurement.quantity !== 'mixed' && state.measurement.quantity !== quantity;
+      }
+    }
 
     const countable = activeCountable();
     countEl.value = String(countable.count);
@@ -649,6 +693,9 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
 
   measurementQuantityEl.addEventListener('change', () => {
     state.measurement.quantity = measurementQuantityEl.value as MeasurementQuantityMode;
+    // refreshFromState (inte bara emitChange) eftersom vilken/vilka storheters
+    // enhetskryssrutor som visas beror på den nya storheten.
+    refreshFromState();
     emitChange();
   });
   measurementMinEl.addEventListener('input', () => {
@@ -665,6 +712,16 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
       emitChange();
     }
   });
+  for (const [quantity, units] of measurementUnitEls) {
+    for (const [symbol, el] of units) {
+      el.addEventListener('change', () => {
+        state.measurement.units[quantity] = el.checked
+          ? [...state.measurement.units[quantity], symbol]
+          : state.measurement.units[quantity].filter((existing) => existing !== symbol);
+        emitChange();
+      });
+    }
+  }
 
   // "Antal uppgifter"/"Undvik dubbletter" är samma synliga fält för alla tre
   // bladtyper (se activeCountable ovan).
@@ -882,6 +939,21 @@ function renderTemplate(): string {
     .map(([value, label]) => `<option value="${value}">${label}</option>`)
     .join('');
 
+  const measurementUnitFieldsHtml = MEASUREMENT_QUANTITIES.map((quantity) => {
+    const checkboxes = MEASUREMENT_UNITS[quantity]
+      .map(
+        (symbol) =>
+          `<label><input type="checkbox" id="measurement-unit-${quantity}-${symbol}" /> ${symbol}</label>`,
+      )
+      .join('');
+    return `
+      <div class="field-grid" id="measurement-units-${quantity}">
+        <span class="level-chips-label">${MEASUREMENT_QUANTITY_SHORT_LABELS[quantity]}:</span>
+        ${checkboxes}
+      </div>
+    `;
+  }).join('');
+
   return `
     <section aria-labelledby="sheettype-heading">
       <h2 id="sheettype-heading">Typ av blad</h2>
@@ -1015,6 +1087,7 @@ function renderTemplate(): string {
           <select id="measurement-quantity">${measurementQuantityOptions}</select>
         </label>
       </div>
+      ${measurementUnitFieldsHtml}
       <div class="op-range">
         <label>Tal från <input type="number" id="measurement-min" min="1" step="1" /></label>
         <label>Till <input type="number" id="measurement-max" min="1" step="1" /></label>

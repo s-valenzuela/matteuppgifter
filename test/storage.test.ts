@@ -117,6 +117,19 @@ describe('saveState / loadState', () => {
     expect(loaded?.measurement.quantity).toBe(createDefaultState().measurement.quantity);
   });
 
+  it('fyller på measurement.units för ett tillstånd sparat innan enhetsvalet fanns', () => {
+    const legacyState = createDefaultState();
+    legacyState.measurement.quantity = 'mass';
+    // @ts-expect-error simulerar JSON sparat innan measurement.units fanns
+    delete legacyState.measurement.units;
+    localStorage.setItem('matteuppgifter:state:v1', JSON.stringify(legacyState));
+
+    const loaded = loadState();
+    expect(loaded?.measurement.units).toEqual(createDefaultState().measurement.units);
+    // Övriga fält (t.ex. quantity) ska inte skrivas över av standardvärdena.
+    expect(loaded?.measurement.quantity).toBe('mass');
+  });
+
   it('behåller egna document-värden som skiljer sig från standardvärdena', () => {
     const state = createDefaultState();
     state.document.header.title = 'Läxa vecka 7';

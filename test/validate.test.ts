@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FRACTION_DENOMINATORS } from '../src/core/fractions';
+import { MEASUREMENT_UNITS } from '../src/core/measurement';
 import {
   validateClockConfig,
   validateConfig,
@@ -399,6 +400,12 @@ describe('validateMeasurementConfig', () => {
   ): MeasurementGeneratorConfig {
     return {
       quantity: 'length',
+      units: {
+        length: [...MEASUREMENT_UNITS.length],
+        mass: [...MEASUREMENT_UNITS.mass],
+        volume: [...MEASUREMENT_UNITS.volume],
+        time: [...MEASUREMENT_UNITS.time],
+      },
       valueRange: { min: 1, max: 200 },
       count: 10,
       avoidDuplicates: true,
@@ -439,5 +446,46 @@ describe('validateMeasurementConfig', () => {
   it('varnar inte för en rimlig konfiguration', () => {
     const { warnings } = validateMeasurementConfig(baseMeasurementConfig());
     expect(warnings).toEqual([]);
+  });
+
+  it('behåller ett giltigt, begränsat enhetsval oförändrat', () => {
+    const { config, warnings } = validateMeasurementConfig(
+      baseMeasurementConfig({ units: { ...baseMeasurementConfig().units, length: ['cm', 'm'] } }),
+    );
+    expect(config.units.length).toEqual(['cm', 'm']);
+    expect(warnings).toEqual([]);
+  });
+
+  it('faller tillbaka till alla enheter och varnar när den valda storheten har färre än två ikryssade', () => {
+    const { config, warnings } = validateMeasurementConfig(
+      baseMeasurementConfig({
+        quantity: 'length',
+        units: { ...baseMeasurementConfig().units, length: ['cm'] },
+      }),
+    );
+    expect(config.units.length).toEqual([...MEASUREMENT_UNITS.length]);
+    expect(warnings.some((w) => w.includes('längd'))).toBe(true);
+  });
+
+  it('varnar inte för en ostört storhets ogiltiga enhetsval (rättar till det tyst)', () => {
+    const { config, warnings } = validateMeasurementConfig(
+      baseMeasurementConfig({
+        quantity: 'length',
+        units: { ...baseMeasurementConfig().units, mass: ['g'] },
+      }),
+    );
+    expect(config.units.mass).toEqual([...MEASUREMENT_UNITS.mass]);
+    expect(warnings).toEqual([]);
+  });
+
+  it('varnar för varje otillräckligt ikryssad storhet i "blandat"-läge', () => {
+    const { warnings } = validateMeasurementConfig(
+      baseMeasurementConfig({
+        quantity: 'mixed',
+        units: { ...baseMeasurementConfig().units, mass: ['g'], time: ['s'] },
+      }),
+    );
+    expect(warnings.some((w) => w.includes('massa'))).toBe(true);
+    expect(warnings.some((w) => w.includes('tid'))).toBe(true);
   });
 });

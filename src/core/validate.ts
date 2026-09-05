@@ -2,7 +2,7 @@ import { clockPoolSize } from './clock';
 import { equationPoolSize } from './equations';
 import { fractionPoolSize, FRACTION_DENOMINATORS } from './fractions';
 import { geometryPoolSize } from './geometry';
-import { measurementPoolSize } from './measurement';
+import { MEASUREMENT_QUANTITIES, MEASUREMENT_UNITS, measurementPoolSize } from './measurement';
 import { patternPoolSize } from './patterns';
 import type {
   ClockGeneratorConfig,
@@ -12,6 +12,7 @@ import type {
   GeneratorConfig,
   GeometryGeneratorConfig,
   MeasurementGeneratorConfig,
+  MeasurementQuantity,
   Operation,
   OperationConfig,
   PatternGeneratorConfig,
@@ -306,7 +307,29 @@ export function validateMeasurementConfig(
     warnings.push('Talområdet justerades till positiva heltal (minst 1).');
   }
 
-  const config: MeasurementGeneratorConfig = { ...input, valueRange, count };
+  // Varje storhet behöver minst två kvarvarande enheter för att kunna bilda
+  // ett enhetspar (se resolveUsableQuantities i core/measurement.ts) — annars
+  // faller den storheten tillbaka till alla sina enheter. Varnar bara om det
+  // drabbar en storhet som faktiskt är i bruk (den valda, eller alla fyra i
+  // "blandat"-läge) — en oanvänd storhets tomma val påverkar aldrig bladet.
+  const relevantQuantities = input.quantity === 'mixed' ? MEASUREMENT_QUANTITIES : [input.quantity];
+  const units = {} as Record<MeasurementQuantity, string[]>;
+  for (const quantity of MEASUREMENT_QUANTITIES) {
+    const allowed = MEASUREMENT_UNITS[quantity];
+    const selected = (input.units[quantity] ?? []).filter((u) => allowed.includes(u));
+    if (selected.length >= 2) {
+      units[quantity] = selected;
+    } else {
+      units[quantity] = [...allowed];
+      if (relevantQuantities.includes(quantity)) {
+        warnings.push(
+          `Minst två enheter måste vara ikryssade för ${quantityLabel(quantity)} — alla enheter valdes automatiskt.`,
+        );
+      }
+    }
+  }
+
+  const config: MeasurementGeneratorConfig = { ...input, valueRange, units, count };
 
   if (input.avoidDuplicates && count > 0) {
     const poolSize = measurementPoolSize(config);
@@ -319,6 +342,19 @@ export function validateMeasurementConfig(
   }
 
   return { config, warnings };
+}
+
+function quantityLabel(quantity: MeasurementQuantity): string {
+  switch (quantity) {
+    case 'length':
+      return 'längd';
+    case 'mass':
+      return 'massa';
+    case 'volume':
+      return 'volym';
+    case 'time':
+      return 'tid';
+  }
 }
 
 function normalizeOperationConfig(config: OperationConfig): OperationConfig {
