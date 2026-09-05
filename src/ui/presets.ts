@@ -30,6 +30,27 @@ export const PRESETS: Preset[] = [
     },
   },
   {
+    id: 'add-sub-no-ten-crossing',
+    label: 'Add./sub. utan tiotalsövergång',
+    build: () => {
+      const state = createDefaultState();
+      state.generator.operations = {
+        add: { enabled: true, operandRange: { min: 0, max: 20 }, avoidTenCrossing: true },
+        sub: {
+          enabled: true,
+          operandRange: { min: 0, max: 20 },
+          noNegative: true,
+          avoidTenCrossing: true,
+        },
+        mul: { enabled: false, operandRange: { min: 0, max: 10 } },
+        div: { enabled: false, operandRange: { min: 1, max: 10 } },
+      };
+      state.document.header.title = 'Addition och subtraktion utan tiotalsövergång';
+      state.document.header.instructions = computeDefaultInstructions(state);
+      return state;
+    },
+  },
+  {
     id: 'multiplication-tables',
     label: 'Multiplikationstabeller',
     build: () => {

@@ -323,6 +323,74 @@ describe('generateProblems', () => {
     });
   });
 
+  describe('avoidTenCrossing (undvik tiotalsövergång)', () => {
+    it('ger aldrig entalssiffror som summerar till 10 eller mer för addition', () => {
+      const config = baseConfig({
+        operations: {
+          add: opConfig({
+            enabled: true,
+            operandRange: { min: 0, max: 20 },
+            avoidTenCrossing: true,
+          }),
+          sub: opConfig(),
+          mul: opConfig(),
+          div: opConfig(),
+        },
+        count: 100,
+        seed: 7,
+      });
+
+      for (const p of generateProblems(config)) {
+        expect((p.a % 10) + (p.b % 10)).toBeLessThan(10);
+      }
+    });
+
+    it('kräver aldrig växling (entalssiffran i b större än i a) för subtraktion', () => {
+      const config = baseConfig({
+        operations: {
+          add: opConfig(),
+          sub: opConfig({
+            enabled: true,
+            operandRange: { min: 0, max: 20 },
+            noNegative: true,
+            avoidTenCrossing: true,
+          }),
+          mul: opConfig(),
+          div: opConfig(),
+        },
+        count: 100,
+        seed: 7,
+      });
+
+      for (const p of generateProblems(config)) {
+        expect(p.a % 10).toBeGreaterThanOrEqual(p.b % 10);
+      }
+    });
+
+    it('påverkar inte multiplikation eller division', () => {
+      const config = baseConfig({
+        operations: {
+          add: opConfig(),
+          sub: opConfig(),
+          mul: opConfig({
+            enabled: true,
+            operandRange: { min: 0, max: 10 },
+            avoidTenCrossing: true,
+          }),
+          div: opConfig({
+            enabled: true,
+            operandRange: { min: 1, max: 10 },
+            avoidTenCrossing: true,
+          }),
+        },
+        count: 40,
+      });
+
+      const problems = generateProblems(config);
+      expect(problems).toHaveLength(40);
+    });
+  });
+
   describe('missingNumber ("Saknat tal")', () => {
     it('ger alltid missingSlot "answer" när saknat tal är avstängt', () => {
       const config = baseConfig({
