@@ -12,10 +12,12 @@ inloggning, inga uppgifter lämnar din dator.
 
 - **Räknesätt** — addition, subtraktion, multiplikation och division, var
   för sig eller blandat, med eget talområde per räknesätt (eller ett
-  gemensamt via nivå-chips: 0–10, 0–20, 10–20, 0–100). Multiplikation kan
-  begränsas till valda tabeller (t.ex. bara tvåans och femmans). Division
-  kan tvingas gå jämnt upp, eller tillåtas ge en rest ("5 r 2"). "Saknat
-  tal" gör att en slumpad del av uppgiften (inte bara svaret) är tom, t.ex.
+  gemensamt via nivå-chips: 0–10, 0–20, 10–20, 0–100). Addition och
+  subtraktion kan begränsas till att undvika tiotalsövergång (ingen
+  växling behövs vid uppställning). Multiplikation kan begränsas till
+  valda tabeller (t.ex. bara tvåans och femmans). Division kan tvingas gå
+  jämnt upp, eller tillåtas ge en rest ("5 r 2"). "Saknat tal" gör att en
+  slumpad del av uppgiften (inte bara svaret) är tom, t.ex.
   `3 + __ = 10`. Två layouter: vågrätt (`12 + 7 = ____`) eller uppställning
   (talen staplade med ett streck ovanför svaret).
 - **Klockan** — läs av en urtavla och skriv tiden (i ord eller digitalt),

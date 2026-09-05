@@ -117,19 +117,46 @@ function problemKey(problem: Problem): string {
  */
 function generateCandidate(op: Operation, config: OperationConfig, rng: Rng): Problem {
   const resultRange = config.resultRange;
-  if (!resultRange) {
+  const avoidTenCrossing = config.avoidTenCrossing ?? false;
+  if (!resultRange && !avoidTenCrossing) {
     return generateRaw(op, config, rng);
   }
 
+  const isAcceptable = (candidate: Problem): boolean => {
+    if (resultRange && !withinRange(candidate.answer, resultRange)) return false;
+    if (avoidTenCrossing && crossesTens(op, candidate.a, candidate.b)) return false;
+    return true;
+  };
+
   let candidate = generateRaw(op, config, rng);
-  for (
-    let attempt = 0;
-    attempt < MAX_ATTEMPTS && !withinRange(candidate.answer, resultRange);
-    attempt++
-  ) {
+  for (let attempt = 0; attempt < MAX_ATTEMPTS && !isAcceptable(candidate); attempt++) {
     candidate = generateRaw(op, config, rng);
   }
   return candidate;
+}
+
+/**
+ * Avgör om en uppgift kräver tiotalsövergång (växling) vid uppställning,
+ * baserat på entalssiffrorna i a och b — se avoidTenCrossing i types.ts.
+ * Bara meningsfullt för addition/subtraktion; multiplikation och division
+ * har inget sådant begrepp och släpps alltid igenom.
+ */
+function crossesTens(op: Operation, a: number, b: number): boolean {
+  const onesA = onesDigit(a);
+  const onesB = onesDigit(b);
+  switch (op) {
+    case 'add':
+      return onesA + onesB >= 10;
+    case 'sub':
+      return onesA < onesB;
+    default:
+      return false;
+  }
+}
+
+/** Entalssiffran i n, korrekt även för negativa tal (JS:s % kan annars ge ett negativt svar). */
+function onesDigit(n: number): number {
+  return ((n % 10) + 10) % 10;
 }
 
 function generateRaw(op: Operation, config: OperationConfig, rng: Rng): Problem {

@@ -167,6 +167,22 @@ describe('encodeState / decodeState', () => {
     expect(decoded?.generator.operations.add.resultRange).toBeUndefined();
   });
 
+  it('behåller avoidTenCrossing för addition och subtraktion genom en tur-och-retur', () => {
+    const state = createDefaultState();
+    state.generator.operations.add.avoidTenCrossing = true;
+    state.generator.operations.sub.avoidTenCrossing = true;
+    const decoded = decodeState(`?${encodeState(state).toString()}`);
+    expect(decoded?.generator.operations.add.avoidTenCrossing).toBe(true);
+    expect(decoded?.generator.operations.sub.avoidTenCrossing).toBe(true);
+  });
+
+  it('avstängd avoidTenCrossing förblir odefinierad genom en tur-och-retur', () => {
+    const state = createDefaultState();
+    const decoded = decodeState(`?${encodeState(state).toString()}`);
+    expect(decoded?.generator.operations.add.avoidTenCrossing).toBeUndefined();
+    expect(decoded?.generator.operations.sub.avoidTenCrossing).toBeUndefined();
+  });
+
   it('städar upp den bokstavliga texten "undefined" som instruktion i redan delade länkar', () => {
     // params.set('instr', undefined) skrev "instr=undefined" i URL:en för
     // tillstånd sparade innan fältet fanns — se decodeInstructions.

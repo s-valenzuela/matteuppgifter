@@ -13,6 +13,14 @@ export interface OperationConfig {
   resultRange?: Range;
   /** Subtraktion: byt plats på operanderna i stället för att ge ett negativt svar. */
   noNegative?: boolean;
+  /**
+   * Addition/subtraktion: undvik tiotalsövergång, dvs. uppgifter där man
+   * måste växla mellan positionerna vid uppställning — additionens
+   * entalssiffror ska aldrig summera till 10 eller mer, och subtraktionens
+   * entalssiffra i a ska aldrig vara mindre än i b. Se crossesTens i
+   * core/generate.ts.
+   */
+  avoidTenCrossing?: boolean;
   /** Multiplikation: begränsa den ena faktorn till dessa tabeller, t.ex. [2, 5, 10]. */
   tables?: number[];
   /** Division: lägg till en rest 0 <= r < divisor i stället för att alltid gå jämnt upp. */

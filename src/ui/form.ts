@@ -131,7 +131,9 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     ]),
   );
 
+  const addAvoidTenCrossing = q<HTMLInputElement>(container, '#op-add-avoidTenCrossing');
   const subNoNegative = q<HTMLInputElement>(container, '#op-sub-noNegative');
+  const subAvoidTenCrossing = q<HTMLInputElement>(container, '#op-sub-avoidTenCrossing');
   const mulTables = q<HTMLInputElement>(container, '#op-mul-tables');
   const divAllowRemainder = q<HTMLInputElement>(container, '#op-div-allowRemainder');
 
@@ -279,7 +281,9 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
       els.resultMin.value = cfg.resultRange ? String(cfg.resultRange.min) : '';
       els.resultMax.value = cfg.resultRange ? String(cfg.resultRange.max) : '';
     }
+    addAvoidTenCrossing.checked = state.generator.operations.add.avoidTenCrossing ?? false;
     subNoNegative.checked = state.generator.operations.sub.noNegative ?? false;
+    subAvoidTenCrossing.checked = state.generator.operations.sub.avoidTenCrossing ?? false;
     mulTables.value = state.generator.operations.mul.tables?.join(',') ?? '';
     divAllowRemainder.checked = state.generator.operations.div.allowRemainder ?? false;
 
@@ -453,8 +457,16 @@ export function mountForm(container: HTMLElement, initialState: AppState): FormC
     els.resultMax.addEventListener('input', updateResultRange);
   }
 
+  addAvoidTenCrossing.addEventListener('change', () => {
+    state.generator.operations.add.avoidTenCrossing = addAvoidTenCrossing.checked;
+    emitChange();
+  });
   subNoNegative.addEventListener('change', () => {
     state.generator.operations.sub.noNegative = subNoNegative.checked;
+    emitChange();
+  });
+  subAvoidTenCrossing.addEventListener('change', () => {
+    state.generator.operations.sub.avoidTenCrossing = subAvoidTenCrossing.checked;
     emitChange();
   });
   mulTables.addEventListener('input', () => {
@@ -891,10 +903,14 @@ function renderTemplate(): string {
         ${levelChips}
       </div>
       <div class="op-grid">
-        ${operationCardHtml('add', '')}
+        ${operationCardHtml(
+          'add',
+          `<label class="op-extra"><input type="checkbox" id="op-add-avoidTenCrossing" /> Undvik tiotalsövergång</label>`,
+        )}
         ${operationCardHtml(
           'sub',
-          `<label class="op-extra"><input type="checkbox" id="op-sub-noNegative" /> Tillåt inte negativa svar</label>`,
+          `<label class="op-extra"><input type="checkbox" id="op-sub-noNegative" /> Tillåt inte negativa svar</label>
+           <label class="op-extra"><input type="checkbox" id="op-sub-avoidTenCrossing" /> Undvik tiotalsövergång</label>`,
         )}
         ${operationCardHtml(
           'mul',

@@ -419,11 +419,15 @@ function encodeOperation(key: Operation, cfg: OperationConfig): string {
   // mellan hela delarna ovan) eftersom ett negativt gräns-tal annars skulle
   // ge ett extra "-"-tecken som kolliderar med separatorn.
   parts.push(cfg.resultRange ? `${cfg.resultRange.min},${cfg.resultRange.max}` : '');
+  // Sist av alla, efter resultRange — samma "alltid sist"-princip, så en
+  // äldre länk utan detta fält (avkodas som undefined) faller tillbaka till
+  // false i decodeOperation, se boolOr.
+  parts.push(boolStr(cfg.avoidTenCrossing ?? false));
   return parts.join(':');
 }
 
 function decodeOperation(key: Operation, raw: string, fallback: OperationConfig): OperationConfig {
-  const [rawMin, rawMax, rawExtra, rawResultRange] = raw.split(':');
+  const [rawMin, rawMax, rawExtra, rawResultRange, rawAvoidTenCrossing] = raw.split(':');
   const min = numberOr(rawMin, fallback.operandRange.min);
   const max = numberOr(rawMax, fallback.operandRange.max);
   const cfg: OperationConfig = { enabled: true, operandRange: { min, max } };
@@ -447,6 +451,14 @@ function decodeOperation(key: Operation, raw: string, fallback: OperationConfig)
       break;
   }
 
+  // Bara addition/subtraktion har ett meningsfullt avoidTenCrossing (se
+  // types.ts) — och sätts, precis som tables/resultRange, bara EXPLICIT när
+  // den är påslagen. Annars lämnas fältet odefinierat (i stället för ett
+  // explicit `false`) så att en avkodad standardkonfiguration blir exakt
+  // likadan som originalet, se urlState.test.ts.
+  if ((key === 'add' || key === 'sub') && boolOr(rawAvoidTenCrossing, false)) {
+    cfg.avoidTenCrossing = true;
+  }
   cfg.resultRange = decodeResultRange(rawResultRange);
   return cfg;
 }
